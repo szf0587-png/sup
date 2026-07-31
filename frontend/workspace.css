@@ -1,0 +1,727 @@
+:root {
+    --ty-canvas: #090d0c;
+    --ty-surface: #101614;
+    --ty-surface-raised: #17201c;
+    --ty-surface-hover: #202b26;
+    --ty-line-subtle: rgba(227, 236, 230, 0.08);
+    --ty-line: rgba(227, 236, 230, 0.14);
+    --ty-text: #edf3ef;
+    --ty-text-muted: #9aa9a0;
+    --ty-text-faint: #67756d;
+    --ty-green: #68d69d;
+    --ty-green-strong: #3fbf7f;
+    --ty-green-soft: rgba(104, 214, 157, 0.14);
+    --ty-earth: #d2a45f;
+    --ty-danger: #de776f;
+}
+
+.ty-workspace {
+    background: var(--ty-canvas);
+    color: var(--ty-text);
+    letter-spacing: 0;
+}
+
+.ty-workspace::after {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    content: "";
+    background-image:
+        radial-gradient(circle at 50% 40%, transparent 0, transparent 32%, rgba(9, 13, 12, 0.28) 100%),
+        repeating-radial-gradient(ellipse at 56% 52%, transparent 0 68px, rgba(210, 164, 95, 0.035) 69px 70px);
+}
+
+#map-stage,
+#map,
+#cesium-map {
+    position: absolute;
+    inset: 0;
+}
+
+#map-stage {
+    z-index: 0;
+    background: #111815;
+}
+
+#map {
+    opacity: 0.76 !important;
+    filter: saturate(0.72) contrast(1.08) brightness(0.78);
+    transition: opacity 240ms ease;
+}
+
+#cesium-map {
+    z-index: 2;
+    visibility: hidden;
+    opacity: 0;
+    background: #101714;
+    transition: opacity 240ms ease;
+}
+
+.is-3d #map {
+    visibility: hidden;
+    opacity: 0 !important;
+}
+
+.is-3d #cesium-map {
+    visibility: visible;
+    opacity: 1;
+}
+
+.map-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-content: center;
+    gap: 12px;
+    color: var(--ty-text-muted);
+    font-size: 13px;
+    background: rgba(9, 13, 12, 0.76);
+}
+
+.map-loading[hidden] {
+    display: none;
+}
+
+.map-loading-spinner {
+    display: inline-block;
+    inline-size: 14px;
+    block-size: 14px;
+    border: 2px solid var(--ty-line);
+    border-top-color: var(--ty-green);
+    border-radius: 50%;
+    animation: ty-spin 800ms linear infinite;
+}
+
+@keyframes ty-spin {
+    to { transform: rotate(360deg); }
+}
+
+.ty-workspace .glass-panel {
+    border-color: var(--ty-line) !important;
+    border-radius: 8px !important;
+    background: rgba(16, 22, 20, 0.94) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 12px 28px rgba(0, 0, 0, 0.3) !important;
+    backdrop-filter: blur(14px);
+}
+
+.ty-workspace .glass-panel:hover {
+    transform: none !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.035), 0 12px 28px rgba(0, 0, 0, 0.3) !important;
+}
+
+.ty-workspace header.absolute {
+    padding: 16px 20px 0 20px !important;
+    align-items: center !important;
+}
+
+.ty-workspace header.absolute > .glass-panel {
+    min-block-size: 44px;
+    padding: 8px 14px !important;
+    border-radius: 6px !important;
+}
+
+.ty-workspace header h1 {
+    color: var(--ty-text) !important;
+    font-size: 14px !important;
+    letter-spacing: 0;
+}
+
+.ty-workspace header h1::after {
+    content: " · 洛南县农业决策工作台";
+    color: var(--ty-text-muted);
+    font-weight: 400;
+}
+
+.ty-workspace > .absolute.top-0.left-6 {
+    left: 20px !important;
+    width: 232px !important;
+    padding-right: 0 !important;
+}
+
+.ty-workspace > .absolute.top-0.left-6 > .glass-panel:first-child {
+    margin-top: 76px !important;
+    padding: 8px !important;
+    gap: 4px !important;
+}
+
+.ty-workspace .nav-item,
+.ty-workspace #nav-scan,
+.ty-workspace #nav-analysis,
+.ty-workspace #nav-models {
+    min-block-size: 42px;
+    padding: 10px 12px !important;
+    border-radius: 6px !important;
+    font-size: 13px;
+}
+
+.ty-workspace #nav-scan.bg-tech-green\/10,
+.ty-workspace #nav-analysis.bg-tech-green\/10,
+.ty-workspace #nav-models.bg-tech-green\/10 {
+    background: var(--ty-green-soft) !important;
+    border-color: rgba(104, 214, 157, 0.25) !important;
+    color: var(--ty-green) !important;
+}
+
+.map-command-bar {
+    position: fixed;
+    top: 78px;
+    left: 268px;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: auto;
+}
+
+.view-segment {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(72px, 1fr));
+    padding: 3px;
+    border: 1px solid var(--ty-line);
+    border-radius: 7px;
+    background: rgba(16, 22, 20, 0.94);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+}
+
+.view-segment button,
+.map-icon-command,
+.ranking-summary button {
+    border: 0;
+    color: var(--ty-text-muted);
+    background: transparent;
+    cursor: pointer;
+}
+
+.view-segment button {
+    display: inline-flex;
+    min-block-size: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: color 160ms ease, background-color 160ms ease;
+}
+
+.view-segment button:hover,
+.view-segment button.is-active {
+    color: var(--ty-green);
+    background: var(--ty-green-soft);
+}
+
+.map-icon-command {
+    inline-size: 42px;
+    block-size: 42px;
+    border: 1px solid var(--ty-line);
+    border-radius: 6px;
+    background: rgba(16, 22, 20, 0.94);
+}
+
+.map-icon-command:hover,
+.ranking-summary button:hover {
+    color: var(--ty-green);
+    background: var(--ty-green-soft);
+}
+
+.map-mode-status {
+    padding: 7px 10px;
+    color: var(--ty-text-muted);
+    border-left: 1px solid var(--ty-line);
+    font: 11px/1.3 "Fira Code", monospace;
+}
+
+.ty-workspace #scan-console > .absolute {
+    right: 20px !important;
+    width: 348px !important;
+    max-height: calc(100dvh - 96px) !important;
+    padding-right: 0 !important;
+}
+
+.town-ranking-panel {
+    overflow: hidden;
+    flex: 0 0 auto;
+    border: 1px solid var(--ty-line);
+    border-radius: 8px;
+    background: rgba(16, 22, 20, 0.95);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
+.town-ranking-panel > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--ty-line-subtle);
+}
+
+.panel-eyebrow {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--ty-earth);
+    font: 10px/1.3 "Fira Code", monospace;
+}
+
+.town-ranking-panel h3 {
+    margin: 0;
+    color: var(--ty-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.data-mode-badge {
+    padding: 3px 7px;
+    border: 1px solid var(--ty-line);
+    border-radius: 999px;
+    color: var(--ty-text-muted);
+    font-size: 10px;
+}
+
+.data-mode-badge.is-mock {
+    color: var(--ty-earth);
+    border-color: rgba(210, 164, 95, 0.3);
+    background: rgba(210, 164, 95, 0.08);
+}
+
+.ranking-summary {
+    display: flex;
+    min-block-size: 36px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    color: var(--ty-text-faint);
+    font-size: 10px;
+}
+
+.ranking-summary button {
+    inline-size: 30px;
+    block-size: 30px;
+    border-radius: 4px;
+}
+
+.town-ranking-list {
+    max-block-size: 278px;
+    overflow-y: auto;
+}
+
+.rank-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 9px;
+    align-items: center;
+    width: 100%;
+    padding: 11px 12px;
+    border: 0;
+    border-top: 1px solid var(--ty-line-subtle);
+    color: inherit;
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+}
+
+.rank-row:hover,
+.rank-row.is-selected {
+    background: var(--ty-green-soft);
+}
+
+.rank-number {
+    color: var(--ty-earth);
+    font: 600 12px/1 "Fira Code", monospace;
+}
+
+.rank-name {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ty-text);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.rank-factors {
+    display: flex;
+    gap: 10px;
+    color: var(--ty-text-faint);
+    font: 10px/1.3 "Fira Code", monospace;
+}
+
+.rank-score {
+    color: var(--ty-green);
+    font: 600 18px/1 "Fira Code", monospace;
+}
+
+.ranking-state {
+    display: flex;
+    min-block-size: 88px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px;
+    color: var(--ty-text-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.ty-workspace button:focus-visible,
+.ty-workspace a:focus-visible,
+.ty-workspace input:focus-visible,
+.ty-workspace select:focus-visible {
+    outline: 2px solid var(--ty-green);
+    outline-offset: 2px;
+}
+
+.cesium-viewer-bottom,
+.cesium-viewer-toolbar,
+.cesium-viewer-animationContainer,
+.cesium-viewer-timelineContainer,
+.cesium-viewer-fullscreenContainer {
+    display: none !important;
+}
+
+@media (max-width: 900px) {
+    .ty-workspace header.absolute > .glass-panel:last-child,
+    .ty-workspace > .absolute.top-0.left-6 > .glass-panel:not(:first-child) {
+        display: none !important;
+    }
+
+    .ty-workspace > .absolute.top-0.left-6 {
+        top: 66px !important;
+        right: 12px !important;
+        bottom: auto !important;
+        left: 12px !important;
+        width: auto !important;
+        flex-direction: row !important;
+    }
+
+    .ty-workspace > .absolute.top-0.left-6 > .glass-panel:first-child {
+        width: 100%;
+        margin-top: 0 !important;
+        flex-direction: row !important;
+    }
+
+    .ty-workspace > .absolute.top-0.left-6 > .glass-panel:first-child > div:first-child {
+        display: none !important;
+    }
+
+    .ty-workspace #nav-scan,
+    .ty-workspace #nav-analysis,
+    .ty-workspace #nav-models {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .ty-workspace #nav-scan span,
+    .ty-workspace #nav-analysis span,
+    .ty-workspace #nav-models span {
+        display: inline !important;
+        font-size: 11px;
+    }
+
+    .map-command-bar {
+        top: 126px;
+        left: 12px;
+    }
+
+    .map-mode-status {
+        display: none;
+    }
+
+    .ty-workspace #scan-console > .absolute {
+        top: auto !important;
+        right: 12px !important;
+        bottom: 12px !important;
+        left: 12px !important;
+        width: auto !important;
+        max-height: 42dvh !important;
+        transform: none !important;
+    }
+
+    .ty-workspace #scan-console > .absolute > .glass-panel:first-child,
+    .ty-workspace #result-panel {
+        display: none !important;
+    }
+
+    .town-ranking-list {
+        max-block-size: 190px;
+    }
+}
+
+@media (max-width: 520px) {
+    .ty-workspace header.absolute {
+        padding: 10px 12px 0 !important;
+    }
+
+    .ty-workspace header h1::after,
+    .ty-workspace header h1 span {
+        display: none;
+    }
+
+    .ty-workspace #nav-scan span,
+    .ty-workspace #nav-analysis span,
+    .ty-workspace #nav-models span {
+        display: none !important;
+    }
+
+    .view-segment {
+        grid-template-columns: repeat(2, 58px);
+    }
+
+    .town-ranking-panel > header,
+    .ranking-summary {
+        padding-inline: 10px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #map,
+    #cesium-map,
+    .view-segment button {
+        transition: none;
+    }
+}
+
+/* ─── Toast 通知系统 ─────────────────────────────────────────── */
+.ty-toast-host {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.ty-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-inline-size: 240px;
+    max-inline-size: 360px;
+    padding: 11px 14px;
+    border: 1px solid var(--ty-line);
+    border-radius: 8px;
+    background: rgba(14, 20, 18, 0.97);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.55), inset 0 1px rgba(255,255,255,0.04);
+    backdrop-filter: blur(14px);
+    color: var(--ty-text);
+    font-size: 12px;
+    line-height: 1.45;
+    pointer-events: auto;
+    animation: ty-toast-in 180ms ease-out forwards;
+}
+
+.ty-toast.is-exiting {
+    animation: ty-toast-out 160ms ease-in forwards;
+}
+
+.ty-toast-icon {
+    flex-shrink: 0;
+    font-size: 13px;
+    margin-top: 1px;
+}
+
+.ty-toast-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+    font-size: 12px;
+}
+
+.ty-toast-msg {
+    color: var(--ty-text-muted);
+    font-size: 11px;
+}
+
+.ty-toast.is-success { border-color: rgba(104, 214, 157, 0.3); }
+.ty-toast.is-success .ty-toast-icon { color: var(--ty-green); }
+
+.ty-toast.is-error { border-color: rgba(222, 119, 111, 0.3); }
+.ty-toast.is-error .ty-toast-icon { color: var(--ty-danger); }
+
+.ty-toast.is-warning { border-color: rgba(210, 164, 95, 0.3); }
+.ty-toast.is-warning .ty-toast-icon { color: var(--ty-earth); }
+
+.ty-toast.is-info { border-color: rgba(96, 165, 250, 0.25); }
+.ty-toast.is-info .ty-toast-icon { color: #60a5fa; }
+
+@keyframes ty-toast-in {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ty-toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(10px); }
+}
+
+/* ─── WebGIS 风格增强 ──────────────────────────────────────────── */
+
+/* 统一面板圆角为 6px（GIS 更紧凑） */
+.ty-workspace .glass-panel {
+    border-radius: 6px !important;
+}
+
+/* 数据密集型标签样式 */
+.gis-label {
+    display: block;
+    color: var(--ty-text-faint);
+    font: 10px/1.3 "Fira Code", monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+}
+
+/* GIS 坐标显示 */
+.gis-coord-bar {
+    display: flex;
+    gap: 16px;
+    padding: 6px 10px;
+    border: 1px solid var(--ty-line);
+    border-radius: 5px;
+    background: rgba(9, 13, 12, 0.8);
+    font: 11px/1.4 "Fira Code", monospace;
+    color: var(--ty-text-muted);
+}
+
+.gis-coord-bar b {
+    color: var(--ty-green);
+    font-weight: 500;
+}
+
+/* 状态徽标 */
+.gis-status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ty-green);
+    box-shadow: 0 0 0 0 rgba(104, 214, 157, 0.6);
+    animation: gis-pulse 2.4s ease-out infinite;
+    flex-shrink: 0;
+}
+
+.gis-status-dot.is-offline {
+    background: var(--ty-danger);
+    box-shadow: none;
+    animation: none;
+}
+
+@keyframes gis-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(104, 214, 157, 0.6); }
+    60%  { box-shadow: 0 0 0 6px rgba(104, 214, 157, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(104, 214, 157, 0); }
+}
+
+/* 工具按钮组（WebGIS 工具条风格） */
+.gis-toolgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--ty-line);
+    border-radius: 7px;
+    background: rgba(14, 20, 18, 0.95);
+}
+
+.gis-tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 5px;
+    color: var(--ty-text-muted);
+    background: transparent;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease;
+}
+
+.gis-tool-btn:hover {
+    background: var(--ty-surface-hover);
+    color: var(--ty-text);
+}
+
+.gis-tool-btn.is-active {
+    background: var(--ty-green-soft);
+    color: var(--ty-green);
+}
+
+.gis-tool-btn i {
+    width: 14px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 操作按钮行 */
+.gis-action-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.gis-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 7px 4px;
+    border: 1px solid var(--ty-line);
+    border-radius: 5px;
+    background: rgba(16, 22, 20, 0.8);
+    color: var(--ty-text-muted);
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+    white-space: nowrap;
+}
+
+.gis-action-btn:hover { background: var(--ty-surface-hover); color: var(--ty-text); }
+.gis-action-btn.is-save { border-color: rgba(210, 164, 95, 0.35); color: var(--ty-earth); }
+.gis-action-btn.is-save:hover { background: rgba(210, 164, 95, 0.1); }
+.gis-action-btn.is-danger { border-color: rgba(222, 119, 111, 0.3); color: var(--ty-danger); }
+.gis-action-btn.is-danger:hover { background: rgba(222, 119, 111, 0.1); }
+.gis-action-btn.is-primary { border-color: rgba(104, 214, 157, 0.35); color: var(--ty-green); }
+.gis-action-btn.is-primary:hover { background: var(--ty-green-soft); }
+
+/* 分隔线 */
+.gis-divider {
+    height: 1px;
+    background: var(--ty-line-subtle);
+    margin: 6px 0;
+}
+
+/* 信息行 */
+.gis-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--ty-line-subtle);
+    font-size: 11px;
+}
+
+.gis-info-row:last-child { border-bottom: 0; }
+.gis-info-key { color: var(--ty-text-faint); }
+.gis-info-val { color: var(--ty-text); font-family: "Fira Code", monospace; }
+
+/* ─── 内容面板顶部偏移修正 ──────────────────────────────────────
+   .map-command-bar 固定在 top:78px，自身高约 42px，底部约 120px。
+   内容面板原 top-20 (80px) 与之重叠，统一下移至 128px 清除遮挡。 */
+#suitability-analysis > .absolute,
+#golden-standard > .absolute {
+    top: 128px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ty-toast,
+    .ty-toast.is-exiting,
+    .gis-status-dot {
+        animation: none !important;
+        transition: none !important;
+    }
+}

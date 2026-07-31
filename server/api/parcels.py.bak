@@ -1,0 +1,29 @@
+"""地块精评 API 路由"""
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from server.services.parcel_evaluation import evaluate_parcel
+
+router = APIRouter(prefix="/api/parcels", tags=["parcels"])
+
+
+class ParcelEvalRequest(BaseModel):
+    town_code: str
+    parcel_geojson: dict
+    golden_standard_id: str
+
+
+@router.post("/evaluate")
+def start_evaluation(req: ParcelEvalRequest):
+    """对指定地块执行综合评价"""
+    try:
+        result = evaluate_parcel(
+            town_code=req.town_code,
+            parcel_geojson=req.parcel_geojson,
+            golden_standard_id=req.golden_standard_id,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

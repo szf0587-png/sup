@@ -1,0 +1,24 @@
+# === 天眼寻珍·苍穹 ===
+# 原有天眼寻珍依赖
+fastapi
+uvicorn[standard]
+pandas
+numpy
+scipy
+earthengine-api
+geemap
+
+# SuperMap 集成新增
+# iobjectspy 已通过 pip install -e E:\SuperMap\bin_python 安装到 terroir_hunter 环境
+requests          # iServer REST API 调用
+python-multipart  # 文件上传（可选，固定影像选择）
+jinja2            # 报告模板渲染
+weasyprint        # HTML → PDF 报告（可选，或直接用浏览器打印）
+
+# 数据库与认证（多用户系统）
+sqlalchemy        # ORM 数据库操作
+bcrypt            # 密码哈希
+pyjwt             # JWT 令牌生成与验证
+
+# 开发工具
+python-dotenv     # 环境变量管理

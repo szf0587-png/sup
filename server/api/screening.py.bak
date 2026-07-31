@@ -1,0 +1,49 @@
+"""区域筛选 API 路由"""
+from __future__ import annotations
+
+import json
+from fastapi import APIRouter, HTTPException
+
+from server.config import GOLDEN_STANDARDS_FILE
+from server.schemas.screening import ScreeningRequest, ScreeningResponse
+from server.services.town_ranking import rank_towns
+
+router = APIRouter(prefix="/api/screening", tags=["screening"])
+
+
+@router.post("/runs")
+def start_screening(req: ScreeningRequest):
+    """启动区域筛选任务，返回 Top N 候选乡镇"""
+    # 验证金标准存在
+    if not GOLDEN_STANDARDS_FILE.exists():
+        raise HTTPException(status_code=404, detail="金标准库不存在")
+
+    with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+        standards = json.load(f)
+
+    matched = [s for s in standards
+               if (s.get("id") or s.get("model_id")) == req.golden_standard_id]
+    if not matched:
+        raise HTTPException(status_code=404, detail=f"金标准 {req.golden_standard_id} 未找到")
+
+    gs = matched[0]
+    result = rank_towns(
+        golden_standard_id=req.golden_standard_id,
+        top_n=req.top_n,
+        county=req.county,
+    )
+
+    result["golden_standard_id"] = req.golden_standard_id
+    result["golden_standard_name"] = gs.get("model_name", "Unknown")
+    return result
+
+
+@router.get("/runs/{run_id}")
+def get_screening_result(run_id: str):
+    """获取已完成的筛选任务结果（从快照读取）"""
+    from server.config import SNAPSHOTS_DIR
+    snap = SNAPSHOTS_DIR / f"{run_id}.json"
+    if not snap.exists():
+        raise HTTPException(status_code=404, detail=f"快照 {run_id} 不存在")
+    with open(snap, "r", encoding="utf-8") as f:
+        return json.load(f)

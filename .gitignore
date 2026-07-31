@@ -1,0 +1,52 @@
+# Python bytecode and test artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and local configuration
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# IDE and operating system files
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Runtime logs and temporary files
+*.log
+*.pid
+tmp-*/
+temp/
+.tmp_*/
+
+# Local databases, generated reports, and user data
+database/*.db
+database/*.db-*
+database/*.backup
+data/users/
+data/snapshots/
+data/gee_cache/
+data/uploads/
+data/outputs/*
+!data/outputs/.gitkeep
+reports/
+
+# Generated frontend and dependency artifacts
+node_modules/
+dist/
+build/
+coverage/
+*.tgz

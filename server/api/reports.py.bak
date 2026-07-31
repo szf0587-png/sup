@@ -1,0 +1,53 @@
+"""报告 API 路由"""
+from __future__ import annotations
+
+import json
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+
+from server.config import SNAPSHOTS_DIR
+from server.services.report_builder import build_report, export_report
+
+router = APIRouter(prefix="/api/reports", tags=["reports"])
+
+
+class ReportRequest(BaseModel):
+    screening_run_id: str
+    parcel_run_id: Optional[str] = None
+
+
+@router.post("/generate")
+def generate_report(req: ReportRequest):
+    """生成决策报告"""
+    # 加载筛选结果快照
+    scr_snap = SNAPSHOTS_DIR / f"{req.screening_run_id}.json"
+    if not scr_snap.exists():
+        raise HTTPException(status_code=404, detail=f"筛选快照 {req.screening_run_id} 不存在")
+
+    with open(scr_snap, "r", encoding="utf-8") as f:
+        screening = json.load(f)
+
+    # 加载地块结果（如果有）
+    parcel = None
+    if req.parcel_run_id:
+        par_snap = SNAPSHOTS_DIR / f"{req.parcel_run_id}.json"
+        if par_snap.exists():
+            with open(par_snap, "r", encoding="utf-8") as f:
+                parcel = json.load(f)
+
+    run_id = req.screening_run_id
+    path = export_report(run_id, screening, parcel)
+    return {"status": "ok", "run_id": run_id, "path": str(path)}
+
+
+@router.get("/{run_id}", response_class=HTMLResponse)
+def view_report(run_id: str):
+    """查看已生成的报告"""
+    from server.config import DATA_DIR
+    path = DATA_DIR / "outputs" / f"report_{run_id}.html"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="报告未生成")
+    return path.read_text(encoding="utf-8")

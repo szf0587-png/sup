@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iServer 地理处理工具</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="iserver-tools.css?v=20260731-3">
+</head>
+<body>
+    <div class="tool-app">
+        <aside class="tool-sidebar" aria-label="主导航">
+            <div class="tool-brand" aria-hidden="true"><i class="fa-solid fa-layer-group"></i></div>
+            <a class="tool-nav" href="index.html" aria-label="土地资源工作台" title="土地资源工作台"><i class="fa-solid fa-map-location-dot"></i></a>
+            <a class="tool-nav is-active" href="iserver-tools.html" aria-label="iServer 地理处理工具" title="iServer 地理处理工具"><i class="fa-solid fa-draw-polygon"></i></a>
+            <a class="tool-nav" href="map3d.html" aria-label="三维场景" title="三维场景"><i class="fa-solid fa-cube"></i></a>
+            <a class="tool-nav" href="golden_standard.html" aria-label="模型库" title="模型库"><i class="fa-solid fa-database"></i></a>
+        </aside>
+
+        <main class="tool-main">
+            <header class="tool-header">
+                <div>
+                    <p class="eyebrow">SuperMap GIS</p>
+                    <h1>iServer 地理处理工具</h1>
+                </div>
+                <div class="header-actions">
+                    <span class="server-status" id="server-status"><i></i>iServer 检测中</span>
+                    <a class="workbench-link" href="index.html"><i class="fa-solid fa-map"></i><span>返回工作台</span></a>
+                </div>
+            </header>
+
+            <section class="tool-layout">
+                <section class="tool-catalog" aria-label="已接入地理处理工具">
+                    <section class="default-catalog" aria-label="土地资源默认工具">
+                        <div class="native-heading">
+                            <div><p class="eyebrow">Land Assessment</p><h2>土地资源默认工具</h2></div>
+                            <span>永久保留</span>
+                        </div>
+                        <p>这五个工作台工具不会随固定工具列表移除。它们以逐步分析方式运行，并把文字结果和可视化结果返回到土地资源工作台。</p>
+                        <div class="default-tool-grid" id="default-tool-grid"></div>
+                    </section>
+
+                    <section class="native-catalog native-catalog-primary" aria-label="iServer 原生空间分析算子">
+                        <div class="native-heading">
+                            <div><p class="eyebrow">Native REST</p><h2>全部已发布原生算子</h2></div>
+                            <span id="native-operation-count">正在读取服务目录</span>
+                        </div>
+                        <p>目录由当前 iServer Spatial Analyst 服务实时发现。选择算子后按 iServer 原生 REST 参数约定填写并直接执行。</p>
+                        <label class="native-search"><i class="fa-solid fa-magnifying-glass"></i><input id="native-operation-search" type="search" placeholder="搜索算子，例如 buffer、overlay、3d"></label>
+                        <div class="native-operation-list" id="native-operation-list"></div>
+                    </section>
+
+                    <section class="curated-catalog" aria-label="常用封装地理处理工具">
+                    <div class="catalog-heading">
+                        <div>
+                            <p class="eyebrow">Curated</p>
+                            <h2>常用封装工具</h2>
+                        </div>
+                        <div class="tool-tabs" role="tablist" aria-label="工具分类">
+                            <button class="tool-tab is-active" type="button" data-filter="all">全部</button>
+                            <button class="tool-tab" type="button" data-filter="assessment">土地评估</button>
+                            <button class="tool-tab" type="button" data-filter="terrain">地形</button>
+                            <button class="tool-tab" type="button" data-filter="density">密度</button>
+                            <button class="tool-tab" type="button" data-filter="overlay">叠加</button>
+                            <button class="tool-tab" type="button" data-filter="interpolation">插值</button>
+                        </div>
+                    </div>
+                    <div class="tool-card-grid" id="tool-card-grid"></div>
+                    </section>
+                </section>
+
+                <aside class="pin-panel" aria-label="工作台固定工具">
+                    <div class="pin-heading">
+                        <div>
+                            <p class="eyebrow">Workbench</p>
+                            <h2>固定工具</h2>
+                        </div>
+                        <strong id="pin-count">0 / 6</strong>
+                    </div>
+                    <p class="pin-description">固定后将在土地资源工作台的 iServer 分析工具区显示。可拖动排序，最多保留 6 个。</p>
+                    <ol class="pinned-list" id="pinned-list"></ol>
+                    <div class="pin-footer">
+                        <button class="reset-pins" id="reset-pins" type="button"><i class="fa-solid fa-rotate-left"></i><span>恢复默认</span></button>
+                    </div>
+                </aside>
+            </section>
+        </main>
+    </div>
+
+    <dialog class="process-dialog" id="process-dialog" aria-labelledby="process-dialog-title">
+        <form id="process-form" method="dialog">
+            <header>
+                <div>
+                    <p class="eyebrow" id="process-family">iServer Processing</p>
+                    <h2 id="process-dialog-title">地理处理参数</h2>
+                </div>
+                <button class="close-button" type="button" data-close-dialog aria-label="关闭" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="process-body" id="process-body"></div>
+            <footer>
+                <button class="cancel-button" type="button" data-close-dialog>取消</button>
+                <button class="run-button" type="submit"><i class="fa-solid fa-play"></i><span>运行工具</span></button>
+            </footer>
+        </form>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite"></div>
+    <script src="auth.js"></script>
+    <script src="iserver-tools.js?v=20260731-4"></script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>土地资源评估工作台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="land-workbench.css?v=20260731-18">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" aria-label="主导航">
+            <div class="brand-mark" aria-hidden="true"><i class="fa-solid fa-layer-group"></i></div>
+            <a class="nav-button is-active" href="index.html" aria-label="土地资源工作台" title="土地资源工作台"><i class="fa-solid fa-map-location-dot"></i></a>
+            <a class="nav-button" href="iserver-tools.html" aria-label="iServer 地理处理工具" title="iServer 地理处理工具"><i class="fa-solid fa-draw-polygon"></i></a>
+            <button class="nav-button" type="button" aria-label="三维场景"><i class="fa-solid fa-cube"></i></button>
+            <button class="nav-button" type="button" aria-label="报告"><i class="fa-solid fa-file-lines"></i></button>
+            <a class="nav-button nav-link" href="golden_standard.html" aria-label="模型库"><i class="fa-solid fa-database"></i></a>
+        </aside>
+
+        <main class="workbench">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">SuperMap GIS</p>
+                    <h1>土地资源评估工作台</h1>
+                </div>
+                <div class="topbar-actions">
+                    <div class="service-chip" id="iserver-chip"><span></span>iServer 检测中</div>
+                    <div class="service-chip" id="scene-chip"><span></span>3D 检测中</div>
+                    <button class="icon-button" id="refresh-capabilities" type="button" aria-label="刷新能力状态">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                    <button class="text-button" id="login-link" type="button">
+                        <i class="fa-solid fa-user-shield"></i><span>登录</span>
+                    </button>
+                </div>
+            </header>
+
+            <section class="workspace-grid">
+                <section class="left-panel" aria-label="任务与范围">
+                    <section class="task-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <p class="eyebrow">Workspace</p>
+                                <h2>任务范围</h2>
+                            </div>
+                            <span class="run-id" id="last-run-id">未运行</span>
+                        </div>
+
+                        <div class="boundary-actions">
+                            <button class="tool-button" id="draw-boundary" type="button">
+                                <i class="fa-solid fa-draw-polygon"></i><span>绘制边界</span>
+                            </button>
+                            <button class="tool-button" id="use-sample-boundary" type="button">
+                                <i class="fa-solid fa-location-crosshairs"></i><span>示例范围</span>
+                            </button>
+                            <button class="tool-button" id="clear-boundary" type="button" aria-label="清除边界">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+
+                        <div class="boundary-status" id="boundary-status">
+                            <strong>边界</strong><span>使用洛南候选范围</span>
+                        </div>
+
+                        <div class="assessment-brief" aria-live="polite">
+                            <strong>阶段成果</strong>
+                            <span id="assessment-scope">0 / 5 个分析工具已完成</span>
+                        </div>
+                    </section>
+
+                    <section class="capability-list" aria-label="能力清单">
+                        <h2>可用能力</h2>
+                        <div class="capability-row"><span>空间分析</span><strong id="cap-overlay">待检测</strong></div>
+                        <div class="capability-row"><span>水体与道路</span><strong id="cap-dem">待检测</strong></div>
+                        <div class="capability-row"><span>DEM 地形</span><strong id="cap-raster">待检测</strong></div>
+                        <div class="capability-row"><span>Realspace</span><strong id="cap-scenes">待检测</strong></div>
+                    </section>
+
+                </section>
+
+                <section class="map-stage" aria-label="地图工作区">
+                    <div id="map"></div>
+                    <div id="scene-preview" aria-hidden="true">
+                        <div class="scene-grid"></div>
+                        <div class="scene-column column-a"></div>
+                        <div class="scene-column column-b"></div>
+                        <div class="scene-column column-c"></div>
+                        <p>3D Realspace</p>
+                    </div>
+                    <div class="map-toolbar" aria-label="地图工具">
+                        <div class="segmented-control" role="group" aria-label="视图模式">
+                            <button id="view-2d" class="is-active" type="button"><i class="fa-solid fa-map"></i><span>2D</span></button>
+                            <button id="view-3d" type="button"><i class="fa-solid fa-cube"></i><span>3D</span></button>
+                        </div>
+                        <div class="map-navigation" role="group" aria-label="地图导航">
+                            <button class="icon-button" id="zoom-in" type="button" aria-label="放大" title="放大">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                            <output id="map-zoom-label" aria-live="polite">Z 4</output>
+                            <button class="icon-button" id="zoom-out" type="button" aria-label="缩小" title="缩小">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <button class="icon-button" id="focus-map" type="button" aria-label="定位评估范围" title="定位评估范围">
+                                <i class="fa-solid fa-crosshairs"></i>
+                            </button>
+                            <button class="icon-button" id="reset-map" type="button" aria-label="重置地图视图" title="重置地图视图">
+                                <i class="fa-solid fa-arrow-rotate-left"></i>
+                            </button>
+                            <button class="icon-button" id="draw-boundary-map" type="button" aria-label="在地图上绘制评估边界" title="绘制评估边界">
+                                <i class="fa-solid fa-draw-polygon"></i>
+                            </button>
+                        </div>
+                        <label class="map-layer-control">
+                            <span>底图</span>
+                            <select id="basemap-select" aria-label="选择底图"></select>
+                        </label>
+                    </div>
+                    <div class="map-scale">
+                        <span></span><span></span><span></span>
+                    </div>
+                </section>
+
+                <aside class="right-panel" aria-label="评估结果">
+                    <section class="score-panel">
+                        <div class="score-ring" id="score-ring" style="--score:0">
+                            <div><strong id="overall-score">--</strong><span id="grade-label">未评估</span></div>
+                        </div>
+                        <div class="decision-block">
+                            <p class="eyebrow">Decision</p>
+                            <h2 id="decision-text">等待评估结果</h2>
+                            <p id="summary-text">选择边界和目标用途后运行评估。</p>
+                        </div>
+                    </section>
+
+                    <section class="toolbox" aria-label="iServer 分析工具">
+                        <div class="toolbox-heading">
+                            <div>
+                                <h2>iServer 分析工具</h2>
+                                <p class="toolbox-meta" id="pinned-tool-count">0 / 6 已固定</p>
+                            </div>
+                            <div class="toolbox-actions">
+                                <a class="icon-button small-icon-button" href="iserver-tools.html" aria-label="管理 iServer 工具" title="管理 iServer 工具"><i class="fa-solid fa-sliders"></i></a>
+                                <button class="icon-button small-icon-button" id="reset-workflow" type="button" aria-label="清除阶段结果" title="清除阶段结果"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                            </div>
+                        </div>
+                        <div class="tool-grid" id="analysis-tool-grid" role="group" aria-label="已固定分析工具">
+                        </div>
+                    </section>
+
+                    <section class="stage-results" aria-label="阶段成果">
+                        <div class="result-header">
+                            <h2>阶段成果</h2>
+                            <span class="run-id" id="tool-run-count">0 / 5</span>
+                        </div>
+                        <div class="stage-result-list" id="stage-result-list" aria-live="polite">
+                            <div class="empty-state">尚未运行分析工具</div>
+                        </div>
+                    </section>
+
+                    <section class="recommendation-panel">
+                        <div class="result-header">
+                            <h2>建议</h2>
+                            <a id="report-link" class="report-link is-disabled" href="#" target="_blank" rel="noreferrer">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i><span>报告</span>
+                            </a>
+                        </div>
+                        <ul id="recommendation-list">
+                            <li>评估完成后显示管控、开发和可视化建议。</li>
+                        </ul>
+                    </section>
+                </aside>
+            </section>
+        </main>
+    </div>
+
+    <dialog class="analysis-dialog" id="analysis-dialog" aria-labelledby="analysis-dialog-title">
+        <form id="analysis-dialog-form" method="dialog">
+            <header class="analysis-dialog-header">
+                <div>
+                    <p class="eyebrow">Analysis Parameters</p>
+                    <h2 id="analysis-dialog-title">分析参数</h2>
+                </div>
+                <button class="icon-button small-icon-button" type="button" data-dialog-close aria-label="关闭参数设置" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="analysis-dialog-body" id="analysis-dialog-body"></div>
+            <footer class="analysis-dialog-footer">
+                <button class="text-button" type="button" data-dialog-close>取消</button>
+                <button class="primary-action" id="analysis-dialog-submit" type="submit"><i class="fa-solid fa-play"></i><span>运行分析</span></button>
+            </footer>
+        </form>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="auth.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="land-workbench.js?v=20260731-19"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+pydeck
+earthengine-api
+geemap
+fastapi
+uvicorn[standard]
+scipy

@@ -1,0 +1,159 @@
+"""金标准 CRUD API 路由"""
+from __future__ import annotations
+
+import json
+import uuid
+import datetime
+from typing import Dict, Any, List
+
+from fastapi import APIRouter, HTTPException, Body
+
+from server.config import GOLDEN_STANDARDS_FILE
+from server.schemas.standards import (
+    GoldenStandard,
+    GoldenStandardCreate,
+    GoldenStandardSummary,
+    GoldenStandardRename,
+)
+
+router = APIRouter(prefix="/api/golden-standards", tags=["golden-standards"])
+
+
+@router.get("", response_model=List[GoldenStandard])
+def list_all():
+    if not GOLDEN_STANDARDS_FILE.exists():
+        return []
+
+    try:
+        with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return []
+
+        normalized = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            n = dict(item)
+            n["id"] = item.get("id") or item.get("model_id")
+            n["created_at"] = item.get("created_at") or datetime.datetime.now().isoformat()
+            if n.get("id") is None:
+                continue
+            try:
+                normalized.append(GoldenStandard(**n))
+            except Exception:
+                continue
+        return normalized
+    except json.JSONDecodeError:
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load standards: {e}")
+
+
+@router.get("/list", response_model=List[GoldenStandardSummary])
+def list_summaries():
+    if not GOLDEN_STANDARDS_FILE.exists():
+        return []
+
+    try:
+        with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return []
+
+        summaries = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            model_id = item.get("id") or item.get("model_id")
+            if model_id is None:
+                continue
+            try:
+                summaries.append(GoldenStandardSummary(
+                    id=model_id,
+                    model_name=item["model_name"],
+                    crop_type=item["crop_type"],
+                    latitude=item["latitude"],
+                    longitude=item["longitude"],
+                ))
+            except Exception:
+                continue
+        return summaries
+    except json.JSONDecodeError:
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load standards: {e}")
+
+
+@router.post("", response_model=Dict[str, Any])
+def create(standard: GoldenStandardCreate):
+    try:
+        current = []
+        if GOLDEN_STANDARDS_FILE.exists():
+            with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+                try:
+                    current = json.load(f)
+                except json.JSONDecodeError:
+                    current = []
+
+        new_entry = standard.model_dump()
+        new_id = str(uuid.uuid4())
+        new_entry["id"] = new_id
+        new_entry["created_at"] = datetime.datetime.now().isoformat()
+        current.append(new_entry)
+
+        with open(GOLDEN_STANDARDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=2, ensure_ascii=False)
+
+        return {"status": "success", "id": new_id, "message": "Golden standard saved"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save: {e}")
+
+
+@router.post("/{model_id}/rename", response_model=Dict[str, Any])
+def rename(model_id: str, body: GoldenStandardRename = Body(...)):
+    name = (body.new_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="new_name cannot be empty")
+    if not GOLDEN_STANDARDS_FILE.exists():
+        raise HTTPException(status_code=404, detail="No standards found")
+
+    try:
+        with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+            current = json.load(f)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Corrupted standards file")
+
+    found = False
+    for m in current:
+        if (m.get("id") or m.get("model_id")) == model_id:
+            m["model_name"] = name
+            found = True
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+
+    with open(GOLDEN_STANDARDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(current, f, indent=2, ensure_ascii=False)
+    return {"status": "success", "message": "Renamed"}
+
+
+@router.delete("/{model_id}", response_model=Dict[str, Any])
+def delete(model_id: str):
+    if not GOLDEN_STANDARDS_FILE.exists():
+        raise HTTPException(status_code=404, detail="No standards found")
+
+    try:
+        with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+            current = json.load(f)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Corrupted standards file")
+
+    original = len(current)
+    current = [m for m in current if (m.get("id") or m.get("model_id")) != model_id]
+    if len(current) == original:
+        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+
+    with open(GOLDEN_STANDARDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(current, f, indent=2, ensure_ascii=False)
+    return {"status": "success", "message": "Deleted"}

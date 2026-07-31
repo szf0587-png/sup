@@ -1,0 +1,85 @@
+"""物候匹配 API 路由"""
+from __future__ import annotations
+
+import json
+import datetime
+import numpy as np
+from typing import List
+
+from fastapi import APIRouter, HTTPException
+
+from server.config import GOLDEN_STANDARDS_FILE
+from server.schemas.phenology import PhenologyMatchRequest, PhenologyMatchResponse, PhenologyMatchResult
+from server.services.phenology import calculate_similarity
+
+router = APIRouter(prefix="/api/phenology", tags=["phenology"])
+
+
+def _load_golden_standards() -> list:
+    if not GOLDEN_STANDARDS_FILE.exists():
+        return []
+    with open(GOLDEN_STANDARDS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _simulate_curve(lat: float, lon: float, is_ndvi: bool = True) -> np.ndarray:
+    """模拟 NDVI/LST 曲线（GEE 不可用时的降级方案）"""
+    days = np.arange(365)
+    if is_ndvi:
+        offset = (lat - 34) * 5
+        peak_day = 180 + offset
+        curve = 0.2 + 0.6 * np.exp(-((days - peak_day) ** 2) / 2000)
+    else:
+        curve = 20 + 15 * np.sin(2 * np.pi * (days - 80) / 365)
+    return curve.tolist()
+
+
+@router.post("/match", response_model=PhenologyMatchResponse)
+def match(req: PhenologyMatchRequest):
+    """
+    将指定地点的物候与金标准库进行一对多对比。
+    GEE 可用时拉取真实 MODIS NDVI 数据；不可用时使用模拟曲线降级。
+    """
+    standards = _load_golden_standards()
+    selected = standards
+    if req.golden_standard_id:
+        selected = [s for s in standards
+                    if (s.get("id") or s.get("model_id")) == req.golden_standard_id]
+    if not selected:
+        raise HTTPException(status_code=404, detail="No matching golden standards found")
+
+    # 本地物候曲线（GEE 不可用时降级为模拟）
+    local_ndvi = _simulate_curve(req.lat, req.lon, is_ndvi=True)
+    local_lst = _simulate_curve(req.lat, req.lon, is_ndvi=False)
+
+    matches: list = []
+    for gs in selected:
+        sim = calculate_similarity(local_ndvi, local_lst, gs["ndvi_curve"], gs["lst_curve"])
+        matches.append(PhenologyMatchResult(
+            golden_standard_id=gs.get("id") or gs.get("model_id", ""),
+            golden_standard_name=gs.get("model_name", "Unknown"),
+            **sim,
+        ))
+
+    matches.sort(key=lambda m: m.similarity_score, reverse=True)
+    top = matches[:req.top_n]
+
+    # 最佳匹配曲线
+    best = standards[0] if standards else {}
+    best_ndvi = best.get("ndvi_curve") if best else None
+    best_lst = best.get("lst_curve") if best else None
+
+    return PhenologyMatchResponse(
+        status="success",
+        data_source="simulated",
+        gee_available=False,
+        gee_message="GEE not configured — using simulated curves",
+        local_lat=req.lat,
+        local_lon=req.lon,
+        local_ndvi=list(local_ndvi),
+        local_lst=list(local_lst),
+        best_golden_ndvi=best_ndvi,
+        best_golden_lst=best_lst,
+        matches=top,
+        sampled_matches=[],
+    )

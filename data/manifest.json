@@ -1,0 +1,89 @@
+{
+  "_description": "洛南县固定案例数据台账 — 每项数据必须记录来源、许可、校验值后方可进入演示",
+  "county": "洛南县",
+  "city": "商洛市",
+  "province": "陕西省",
+  "coord_sys": "EPSG:4326",
+  "datasets": {
+    "luonan_boundary": {
+      "file": "vector/luonan_boundary.geojson",
+      "description": "洛南县行政边界",
+      "source": "待获取 — 全国地理信息资源目录服务系统 / 天地图",
+      "license": "待确认",
+      "format": "GeoJSON",
+      "expected_fields": ["name", "code"],
+      "status": "missing",
+      "sha256": null
+    },
+    "luonan_towns": {
+      "file": "vector/luonan_towns.geojson",
+      "description": "洛南县乡镇边界",
+      "source": "待获取 — 同上或 OpenStreetMap",
+      "license": "待确认",
+      "format": "GeoJSON",
+      "expected_fields": ["town_name", "town_code", "area_km2"],
+      "status": "missing",
+      "sha256": null
+    },
+    "luonan_dem": {
+      "file": "raster/luonan_dem.tif",
+      "description": "洛南县 DEM (30m SRTM 或 12.5m ALOS)",
+      "source": "待下载 — USGS EarthExplorer / ASF DAAC",
+      "license": "Public Domain (SRTM)",
+      "format": "GeoTIFF",
+      "resolution_m": 30,
+      "status": "missing",
+      "sha256": null
+    },
+    "luonan_constraints": {
+      "file": "vector/luonan_constraints.geojson",
+      "description": "禁建区、水体、建设用地约束图层",
+      "source": "待获取 — OpenStreetMap 水系+建设用地 / Globeland30",
+      "license": "ODbL (OSM)",
+      "format": "GeoJSON",
+      "status": "missing",
+      "sha256": null
+    },
+    "gee_ndvi_cache": {
+      "file": "gee_cache/ndvi_2023_luonan.json",
+      "description": "MODIS MOD13Q1 NDVI 时序缓存 (2023)",
+      "source": "GEE — MODIS/006/MOD13Q1",
+      "license": "NASA Public Domain",
+      "format": "JSON (DOY→NDVI dict)",
+      "status": "missing",
+      "sha256": null
+    },
+    "gee_lst_cache": {
+      "file": "gee_cache/lst_2023_luonan.json",
+      "description": "MODIS MOD11A2 LST 时序缓存 (2023)",
+      "source": "GEE — MODIS/006/MOD11A2",
+      "license": "NASA Public Domain",
+      "format": "JSON (DOY→LST dict)",
+      "status": "missing",
+      "sha256": null
+    },
+    "hires_image": {
+      "file": "raster/luonan_hires.tif",
+      "description": "国产高分影像或等价高分辨率正射影像",
+      "source": "待获取 — 自然资源部 / 高分中心 / 公开正射影像",
+      "license": "待确认",
+      "format": "GeoTIFF",
+      "min_resolution_m": 5,
+      "status": "missing",
+      "sha256": null,
+      "note": "未取得前使用公开正射影像验证链路，不产出正式设施证据"
+    },
+    "golden_standards": {
+      "file": "golden_standards.json",
+      "description": "金标准库 (已从原天眼寻珍复制)",
+      "status": "present",
+      "sha256": null
+    },
+    "freeze_snapshot": {
+      "file": "snapshots/",
+      "description": "固定案例冻结快照 (Top 5 结果、物候匹配、大棚预计算结果)",
+      "status": "pending",
+      "note": "每次分析任务产出后冻结到此目录"
+    }
+  }
+}

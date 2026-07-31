@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天眼寻珍·苍穹 - 新架构演示</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet.Draw -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #22c55e;
+            --secondary: #3b82f6;
+            --bg-dark: #0f172a;
+            --bg-glass: rgba(15,23,42,0.9);
+            --text-primary: #f1f5f9;
+            --border: rgba(255,255,255,0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+        }
+
+        /* 玻璃拟态面板 */
+        .glass-panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 加载动画 */
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 地图容器 */
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Toast通知 */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 10000;
+        }
+
+        .toast {
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            min-width: 250px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success { border-left: 3px solid #22c55e; }
+        .toast.error { border-left: 3px solid #ef4444; }
+        .toast.warning { border-left: 3px solid #f59e0b; }
+        .toast.info { border-left: 3px solid #3b82f6; }
+    </style>
+</head>
+
+<body class="overflow-hidden">
+    <!-- Toast容器 -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- 顶部导航栏 -->
+    <div style="position: fixed; top: 0; left: 0; right: 0; height: 64px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 50; display: flex; align-items: center; padding: 0 20px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <i class="fas fa-satellite-dish" style="color: #22c55e; font-size: 24px;"></i>
+            <div>
+                <div style="font-size: 18px; font-weight: 600; color: #f1f5f9;">天眼寻珍·苍穹</div>
+                <div style="font-size: 12px; color: #94a3b8;">新架构演示</div>
+            </div>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="color: #94a3b8; font-size: 14px;">
+            <i class="fas fa-circle" style="color: #22c55e; font-size: 8px; margin-right: 6px;"></i>
+            系统就绪
+        </div>
+    </div>
+
+    <!-- 地图容器 -->
+    <div id="map-container" style="position: fixed; top: 64px; left: 64px; right: 0; bottom: 0; z-index: 0;"></div>
+
+    <!-- 简化的认证模块（演示用） -->
+    <script>
+        // 简化的Auth对象
+        window.Auth = {
+            async checkAuth() {
+                // 演示模式，直接返回成功
+                return Promise.resolve({ user: { id: 1, username: 'demo' } });
+            },
+            async fetch(url, options = {}) {
+                // 添加认证头
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                };
+                return fetch(url, { ...options, headers });
+            }
+        };
+
+        // 简化的TopNavbar对象
+        window.TopNavbar = {
+            async init() {
+                // 演示模式，不需要初始化
+                return Promise.resolve();
+            }
+        };
+    </script>
+
+    <!-- ===== API封装模块 ===== -->
+    <script src="js/api/map-services.js"></script>
+    <script src="js/api/spatial-analysis.js"></script>
+    <script src="js/api/data-editing.js"></script>
+    <script src="js/api/data-management.js"></script>
+    <script src="js/api/scene-3d.js"></script>
+
+    <!-- ===== UI组件 ===== -->
+    <script src="js/components/sidebar.js"></script>
+    <script src="js/components/right-panel.js"></script>
+
+    <!-- ===== 功能管理器 ===== -->
+    <script src="js/map/map-manager.js"></script>
+    <script src="js/map/draw-tools.js"></script>
+    <script src="js/map/layer-manager.js"></script>
+    <script src="js/components/analysis-tools.js"></script>
+    <script src="js/components/data-manager.js"></script>
+
+    <script>
+        // Toast通知系统
+        window.showToast = function(type, title, message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-start">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} mr-3 mt-1"></i>
+                    <div class="flex-1">
+                        <div class="font-semibold mb-1">${title}</div>
+                        <div class="text-sm text-slate-300">${message}</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
+        // 页面初始化
+        window.onload = async function() {
+            try {
+                console.log('=== 开始初始化 ===');
+
+                // 认证检查（演示模式自动通过）
+                await Auth.checkAuth();
+                await TopNavbar.init();
+                console.log('✓ 认证完成（演示模式）');
+
+                // 初始化地图
+                const map = L.map('map-container', {
+                    zoomControl: true,
+                    attributionControl: true
+                }).setView([34.09, 110.15], 10);
+
+                // 添加默认底图
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors',
+                    subdomains: ['a', 'b', 'c']
+                }).addTo(map);
+
+                window.mainMap = map;
+                console.log('✓ 地图初始化完成');
+
+                // 初始化UI组件
+                if (window.Sidebar) {
+                    window.Sidebar.render();
+                    console.log('✓ 左侧工具栏初始化完成');
+                }
+
+                if (window.RightPanel) {
+                    window.RightPanel.render();
+                    console.log('✓ 右侧面板初始化完成');
+                }
+
+                // 初始化管理器
+                window.MapManager = new MapManager(map);
+                window.DrawTools = new DrawTools(map);
+                window.LayerManager = new LayerManager(map);
+
+                await window.MapManager.init();
+                window.DrawTools.init();
+                await window.LayerManager.init();
+                window.AnalysisTools.init();
+                window.DataManager.init();
+
+                console.log('✓ 所有管理器初始化完成');
+                console.log('=== 初始化完成 ===');
+
+                showToast('success', '系统就绪', '所有功能已加载完成！点击左侧按钮开始使用');
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                showToast('error', '初始化失败', error.message);
+            }
+        };
+    </script>
+</body>
+</html>
