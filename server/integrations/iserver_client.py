@@ -270,12 +270,13 @@ def list_realspace_services() -> list[dict]:
             service_name = service.get("name", "")
             if not service_name:
                 continue
-            if service_name.startswith("3D-") or service_name.startswith("realspace-"):
-                clean_name = service_name.replace("3D-", "").replace("realspace-", "")
+            published_name = service_name.split("/", 1)[0]
+            if published_name.startswith("3D-") or published_name.startswith("realspace-"):
+                clean_name = published_name.replace("3D-", "", 1).replace("realspace-", "", 1)
                 scenes.append({
                     "scene_name": clean_name,
-                    "service_name": service_name,
-                    "scene_url": f"{ISERVER_BASE}/iserver/services/{service_name}/rest/realspace",
+                    "service_name": published_name,
+                    "scene_url": f"{ISERVER_BASE}/iserver/services/{published_name}/rest/realspace",
                     "terrain_available": True,
                     "description": service.get("description"),
                 })

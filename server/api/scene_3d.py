@@ -8,7 +8,9 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Optional
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.parse import quote
 
 from server.api.auth import get_current_user
 from server.models.user import User
@@ -16,6 +18,172 @@ from server.integrations import iserver_client
 from server.config import ISERVER_BASE, DATA_DIR
 
 router = APIRouter(prefix="/api/3d-services", tags=["3d-services"])
+
+
+def _normalise_service_name(value: str) -> str:
+    """iServer service catalog may return ``name/rest``; URLs need the id only."""
+    return (value or "").split("/", 1)[0].strip()
+
+
+def _clean_scene_name(service_name: str) -> str:
+    name = _normalise_service_name(service_name)
+    for prefix in ("3D-", "realspace-"):
+        if name.startswith(prefix):
+            return name[len(prefix):]
+    return name
+
+
+def _realspace_url(service_name: str) -> str:
+    return f"{ISERVER_BASE}/iserver/services/{_normalise_service_name(service_name)}/rest/realspace"
+
+
+def _json_get(session, url: str, timeout: int = 8):
+    response = session.get(url if url.endswith(".json") else f"{url}.json", timeout=timeout)
+    if response.status_code != 200:
+        return None
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def _service_catalog(session) -> list[dict]:
+    payload = _json_get(session, f"{ISERVER_BASE}/iserver/services", timeout=10) or []
+    services = payload if isinstance(payload, list) else payload.get("services", [])
+    return [
+        item for item in services
+        if isinstance(item, dict)
+        and (_normalise_service_name(item.get("name", "")).startswith("3D-")
+             or _normalise_service_name(item.get("name", "")).startswith("realspace-"))
+    ]
+
+
+def _resolve_service(session, scene_name: str) -> tuple[str, str]:
+    requested = _normalise_service_name(scene_name)
+    for item in _service_catalog(session):
+        raw_name = item.get("name", "")
+        service_name = _normalise_service_name(raw_name)
+        if requested in {service_name, _clean_scene_name(service_name)}:
+            return service_name, _clean_scene_name(service_name)
+    for candidate in (requested, f"3D-{requested}", f"realspace-{requested}"):
+        if _json_get(session, f"{_realspace_url(candidate)}", timeout=5) is not None:
+            return candidate, _clean_scene_name(candidate)
+    raise HTTPException(status_code=404, detail=f"三维服务 '{scene_name}' 不存在")
+
+
+def _resource_items(payload: object, collection_key: str) -> list[dict]:
+    """Normalize iServer resource catalogs across list and singleton responses.
+
+    iServer returns an array when a catalog contains multiple resources, but
+    returns the resource object itself when only one scene or dataset exists.
+    Keeping that distinction out of the route logic prevents a valid one-item
+    catalog from being reported as empty.
+    """
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if not isinstance(payload, dict):
+        return []
+
+    nested = payload.get(collection_key)
+    if isinstance(nested, list):
+        return [item for item in nested if isinstance(item, dict)]
+    if isinstance(nested, dict):
+        return [nested]
+
+    if payload.get("name") or payload.get("path"):
+        return [payload]
+    return []
+
+
+def _scene_catalog(session, service_name: str) -> list[dict]:
+    payload = _json_get(session, f"{_realspace_url(service_name)}/scenes") or []
+    return _resource_items(payload, "scenes")
+
+
+def _data_catalog(session, service_name: str) -> list[dict]:
+    payload = _json_get(session, f"{_realspace_url(service_name)}/datas") or []
+    return _resource_items(payload, "datas")
+
+
+def _scene_resource_name(item: dict) -> str:
+    return item.get("name") or item.get("sceneName") or "默认场景"
+
+
+def _scene_url(service_name: str, scene_name: str) -> str:
+    return f"{_realspace_url(service_name)}/scenes/{quote(scene_name, safe='')}"
+
+
+def _terrain_data_url(service_name: str, layers: object) -> Optional[str]:
+    """Build the iServer SCT endpoint for the terrain layer in a scene."""
+    if not isinstance(layers, list):
+        return None
+    for layer in layers:
+        if not isinstance(layer, dict):
+            continue
+        is_terrain = (
+            layer.get("layer3DType") == "TerrainFileLayer"
+            or layer.get("cacheType") == "TIN"
+            or layer.get("type") == "TerrainFileLayer"
+            or layer.get("cache_type") == "TIN"
+        )
+        data_name = layer.get("dataName") or layer.get("data_name") or layer.get("name")
+        if is_terrain and data_name:
+            return f"{_realspace_url(service_name)}/datas/{quote(str(data_name), safe='@')}"
+    return None
+
+
+def _normalise_bounds(value: object) -> Optional[dict[str, float]]:
+    """Normalize iServer/SCT bounds to west/south/east/north."""
+    if not isinstance(value, dict):
+        return None
+    candidates = (
+        ("west", "south", "east", "north"),
+        ("left", "bottom", "right", "top"),
+        ("minX", "minY", "maxX", "maxY"),
+    )
+    for west_key, south_key, east_key, north_key in candidates:
+        if all(key in value for key in (west_key, south_key, east_key, north_key)):
+            try:
+                west = float(value[west_key])
+                south = float(value[south_key])
+                east = float(value[east_key])
+                north = float(value[north_key])
+            except (TypeError, ValueError):
+                continue
+            if west < east and south < north:
+                return {"west": west, "south": south, "east": east, "north": north}
+    nested = value.get("bounds")
+    return _normalise_bounds(nested) if nested is not value else None
+
+
+def _sct_bounds(layer: dict) -> Optional[dict[str, float]]:
+    """Read bounds from an SCT file when iServer omits layer bounds."""
+    direct = _normalise_bounds(layer.get("bounds"))
+    if direct:
+        return direct
+    config_path = layer.get("dataConfigPath")
+    if not config_path:
+        return None
+    path = Path(str(config_path))
+    if not path.is_file() or path.suffix.lower() != ".sct":
+        return None
+    try:
+        # SCT metadata commonly declares GB18030, which ElementTree cannot
+        # parse directly from a binary stream on this runtime.
+        root = ET.fromstring(path.read_bytes().decode("gb18030"))
+        values = {}
+        for element in root.iter():
+            name = element.tag.rsplit("}", 1)[-1]
+            if name in {"Left", "Bottom", "Right", "Top"}:
+                values[name.lower()] = float((element.text or "").strip())
+        return _normalise_bounds({
+            "left": values.get("left"),
+            "bottom": values.get("bottom"),
+            "right": values.get("right"),
+            "top": values.get("top"),
+        })
+    except (ET.ParseError, OSError, TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +202,7 @@ class SceneInfo(BaseModel):
 class TerrainConfig(BaseModel):
     """地形服务配置"""
     scene_name: str
-    terrain_url: str
+    terrain_url: Optional[str] = None
     dem_source: str
     resolution: str
     cache_format: str = "sct"
@@ -68,39 +236,43 @@ async def list_3d_scenes(
         if response.status_code != 200:
             raise HTTPException(status_code=500, detail="无法连接iServer")
 
-        data = response.json()
         scenes = []
-
-        # 过滤三维场景服务
-        for service in data:
-            service_name = service.get("name", "")
-            if service_name.startswith("3D-") or service_name.startswith("realspace-"):
-                clean_name = service_name.replace("3D-", "").replace("realspace-", "")
-
-                # 获取场景详细信息
-                scene_url = f"{ISERVER_BASE}/iserver/services/{service_name}/rest/realspace"
-
-                try:
-                    scene_response = session.get(f"{scene_url}.json", timeout=5)
-                    if scene_response.status_code == 200:
-                        scene_data = scene_response.json()
-
-                        scenes.append({
-                            "scene_name": clean_name,
-                            "scene_url": scene_url,
-                            "terrain_available": "terrain" in str(scene_data).lower(),
-                            "layers": scene_data.get("layers", []) if isinstance(scene_data, dict) else [],
-                            "description": service.get("description"),
-                        })
-                except Exception:
-                    # 如果获取详情失败，仍然添加基本信息
-                    scenes.append({
-                        "scene_name": clean_name,
-                        "scene_url": scene_url,
-                        "terrain_available": False,
-                        "layers": [],
-                        "description": service.get("description"),
-                    })
+        for service in _service_catalog(session):
+            service_name = _normalise_service_name(service.get("name", ""))
+            scene_url = _realspace_url(service_name)
+            scene_catalog = _scene_catalog(session, service_name)
+            data_catalog = _data_catalog(session, service_name)
+            scene_items = []
+            layers = []
+            for item in scene_catalog:
+                scene_item_name = _scene_resource_name(item)
+                scene_item_url = _scene_url(service_name, scene_item_name)
+                scene_data = _json_get(session, scene_item_url, timeout=8) or {}
+                scene_layers = scene_data.get("layers", []) if isinstance(scene_data, dict) else []
+                layers.extend(scene_layers)
+                scene_items.append({
+                    "name": scene_item_name,
+                    "url": scene_item_url,
+                    "camera": scene_data.get("camera") if isinstance(scene_data, dict) else None,
+                })
+            terrain_available = any(
+                layer.get("layer3DType") == "TerrainFileLayer"
+                or layer.get("cacheType") == "TIN"
+                for layer in layers if isinstance(layer, dict)
+            )
+            scenes.append({
+                "scene_name": _clean_scene_name(service_name),
+                "service_name": service_name,
+                "scene_url": scene_url,
+                "terrain_available": terrain_available,
+                "layers": layers,
+                "scenes": scene_items,
+                "datasets": [
+                    {"name": item.get("name"), "url": item.get("path"), "type": item.get("resourceType")}
+                    for item in data_catalog if isinstance(item, dict)
+                ],
+                "description": service.get("description"),
+            })
 
         return {
             "status": "success",
@@ -108,6 +280,8 @@ async def list_3d_scenes(
             "scenes": scenes,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取三维场景列表失败: {str(e)}")
 
@@ -129,39 +303,30 @@ async def get_3d_scene_info(
     try:
         session = iserver_client._get_session()
 
-        # 尝试不同的服务名称格式
-        possible_names = [
-            f"3D-{scene_name}",
-            f"realspace-{scene_name}",
-            scene_name,
-        ]
-
-        scene_data = None
-        actual_service_name = None
-
-        for service_name in possible_names:
-            try:
-                url = f"{ISERVER_BASE}/iserver/services/{service_name}/rest/realspace.json"
-                response = session.get(url, timeout=5)
-
-                if response.status_code == 200:
-                    scene_data = response.json()
-                    actual_service_name = service_name
-                    break
-            except Exception:
-                continue
-
+        actual_service_name, clean_name = _resolve_service(session, scene_name)
+        scene_catalog = _scene_catalog(session, actual_service_name)
+        selected_scene_name = _scene_resource_name(scene_catalog[0]) if scene_catalog else "默认场景"
+        for item in scene_catalog:
+            if _scene_resource_name(item) == scene_name:
+                selected_scene_name = scene_name
+                break
+        scene_data = _json_get(session, _scene_url(actual_service_name, selected_scene_name), timeout=10) or {}
         if not scene_data:
-            raise HTTPException(
-                status_code=404,
-                detail=f"三维场景 '{scene_name}' 不存在"
-            )
+            raise HTTPException(status_code=404, detail=f"三维服务 '{scene_name}' 没有可读取的场景")
+        layers = scene_data.get("layers", []) if isinstance(scene_data, dict) else []
 
         return {
             "status": "success",
-            "scene_name": scene_name,
+            "scene_name": clean_name,
+            "scene_resource": selected_scene_name,
             "service_name": actual_service_name,
-            "scene_url": f"{ISERVER_BASE}/iserver/services/{actual_service_name}/rest/realspace",
+            "scene_url": _realspace_url(actual_service_name),
+            "scene_resource_url": _scene_url(actual_service_name, selected_scene_name),
+            "terrain_available": any(
+                layer.get("layer3DType") == "TerrainFileLayer" or layer.get("cacheType") == "TIN"
+                for layer in layers if isinstance(layer, dict)
+            ),
+            "layers": layers,
             "data": scene_data,
         }
 
@@ -183,7 +348,7 @@ async def get_3d_scene_config(
     ```json
     {
       "scene_url": "http://localhost:8090/iserver/services/3D-luonan/rest/realspace",
-      "terrain_url": "http://localhost:8090/iserver/services/3D-luonan/rest/realspace/terrain",
+      "terrain_url": "http://localhost:8090/iserver/services/3D-luonan/rest/realspace/datas/DatasetDEM",
       "layers": [
         {"name": "影像图层", "type": "imagery", "url": "..."},
         {"name": "矢量数据", "type": "vector", "url": "..."}
@@ -226,24 +391,51 @@ async def get_3d_scene_config(
     scene_info_response = await get_3d_scene_info(scene_name, current_user)
     service_name = scene_info_response["service_name"]
 
-    scene_url = f"{ISERVER_BASE}/iserver/services/{service_name}/rest/realspace"
-    terrain_url = f"{scene_url}/terrain"
-
-    # 从配置或数据库获取初始视角
+    scene_url = scene_info_response["scene_url"]
+    scene_resource_url = scene_info_response["scene_resource_url"]
+    scene_data = scene_info_response.get("data") or {}
+    camera = scene_data.get("camera") or {}
     from server.config import CASE_STUDY
 
+    initial_view = {
+        "longitude": camera.get("longitude", CASE_STUDY["center_lon"]),
+        "latitude": camera.get("latitude", CASE_STUDY["center_lat"]),
+        "height": camera.get("altitude", 18000),
+        "heading": camera.get("heading", 0),
+        "pitch": -45 if camera.get("tilt", 0) == 0 else -30,
+    }
+    layers = []
+    terrain_bounds = None
+    for layer in scene_info_response.get("layers", []):
+        if not isinstance(layer, dict):
+            continue
+        layers.append({
+            "name": layer.get("name") or layer.get("caption"),
+            "type": layer.get("layer3DType") or layer.get("cacheType") or "3D layer",
+            "visible": layer.get("visible", True),
+            "queryable": layer.get("queryable", False),
+            "cache_type": layer.get("cacheType"),
+            "data_name": layer.get("dataName"),
+        })
+        if terrain_bounds is None and (
+            layer.get("layer3DType") == "TerrainFileLayer" or layer.get("cacheType") == "TIN"
+        ):
+            terrain_bounds = _sct_bounds(layer)
+
     return {
+        "scene_name": scene_info_response["scene_name"],
+        "scene_resource": scene_info_response["scene_resource"],
+        "service_name": service_name,
         "scene_url": scene_url,
-        "terrain_url": terrain_url,
-        "layers": [],  # TODO: 从场景数据解析图层
-        "initial_view": {
-            "longitude": CASE_STUDY["center_lon"],
-            "latitude": CASE_STUDY["center_lat"],
-            "height": 50000,
-            "heading": 0,
-            "pitch": -90,
-        },
-        "attribution": "SuperMap iServer 3D",
+        "scene_resource_url": scene_resource_url,
+        "terrain_url": _terrain_data_url(service_name, scene_info_response.get("layers", [])),
+        "terrain_provider": "SuperMapTerrainProvider (SCT)",
+        "terrain_available": scene_info_response.get("terrain_available", False),
+        "layers": layers,
+        "terrain_bounds": terrain_bounds,
+        "initial_view": initial_view,
+        "attribution": "SuperMap iServer Realspace",
+        "note": "SCT 地形作为 Realspace TerrainFileLayer 由 iClient3D 加载，不是 Cesium terrain endpoint。",
     }
 
 
@@ -268,28 +460,36 @@ async def get_terrain_info(
     try:
         session = iserver_client._get_session()
 
-        # 尝试访问地形服务
-        possible_names = [f"3D-{scene_name}", f"realspace-{scene_name}", scene_name]
-
-        for service_name in possible_names:
-            terrain_url = f"{ISERVER_BASE}/iserver/services/{service_name}/rest/realspace/terrain"
-
-            try:
-                response = session.get(f"{terrain_url}.json", timeout=5)
-
-                if response.status_code == 200:
-                    terrain_data = response.json()
-
-                    return {
-                        "status": "success",
-                        "scene_name": scene_name,
-                        "terrain_url": terrain_url,
-                        "terrain_data": terrain_data,
-                        "cache_format": "sct",
-                        "note": "地形缓存需在SuperMap iDesktopX中生成",
-                    }
-            except Exception:
-                continue
+        service_name, clean_name = _resolve_service(session, scene_name)
+        scene_catalog = _scene_catalog(session, service_name)
+        scene_resource = _scene_resource_name(scene_catalog[0]) if scene_catalog else "默认场景"
+        scene_url = _scene_url(service_name, scene_resource)
+        scene_data = _json_get(session, scene_url, timeout=8) or {}
+        layers = scene_data.get("layers", []) if isinstance(scene_data, dict) else []
+        terrain_layers = [
+            layer for layer in layers
+            if isinstance(layer, dict)
+            and (layer.get("layer3DType") == "TerrainFileLayer" or layer.get("cacheType") == "TIN")
+        ]
+        if terrain_layers:
+            terrain_bounds = None
+            for layer in terrain_layers:
+                terrain_bounds = _sct_bounds(layer)
+                if terrain_bounds:
+                    break
+            return {
+                "status": "success",
+                "scene_name": clean_name,
+                "scene_resource": scene_resource,
+                "terrain_available": True,
+                "realspace_url": _realspace_url(service_name),
+                "scene_url": scene_url,
+                "terrain_url": _terrain_data_url(service_name, terrain_layers),
+                "terrain_layers": terrain_layers,
+                "terrain_bounds": terrain_bounds,
+                "cache_format": "sct",
+                "note": "SCT 已作为 Realspace TerrainFileLayer 发布，由 iClient3D Realspace 加载。",
+            }
 
         raise HTTPException(
             status_code=404,

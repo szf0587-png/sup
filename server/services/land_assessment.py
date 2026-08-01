@@ -146,6 +146,7 @@ def list_land_assessment_capabilities() -> dict[str, Any]:
     online = iserver_client.check_iserver()
     basemaps = iserver_client.list_basemap_services() if online else []
     china_datasets = iserver_client.list_data_datasets("China100") if online else []
+    realspace_services = iserver_client.list_realspace_services() if online else []
     available = set(china_datasets)
     return {
         "iServer": online,
@@ -158,9 +159,16 @@ def list_land_assessment_capabilities() -> dict[str, Any]:
             "administrative": [{"datasource": "China100", "dataset": "Province_R", "label": "Provinces"}],
         },
         "published_datasets": china_datasets,
-        "dem_available": False,
-        "realspace_available": False,
-        "unavailable": ["DEM terrain analysis", "land-use suitability classification", "3D Realspace verification"],
+        "dem_available": any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}),
+        "realspace_available": bool(realspace_services),
+        "3d_scenes": realspace_services,
+        "unavailable": [
+            item for item, enabled in {
+                "DEM terrain analysis": any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}),
+                "land-use suitability classification": False,
+                "3D Realspace verification": not bool(realspace_services),
+            }.items() if not enabled
+        ],
         "components": sorted(AVAILABLE_COMPONENTS),
     }
 

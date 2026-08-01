@@ -1,305 +1,441 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>天眼寻珍·苍穹 — 三维决策视图</title>
-<style>
-  html, body, #cesiumContainer {
-    width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
-  }
-  #toolbar {
-    position: absolute; top: 10px; left: 10px; z-index: 100;
-    background: rgba(0,0,0,0.7); color: white; padding: 10px 15px;
-    border-radius: 8px; font-family: 'Microsoft YaHei', sans-serif; font-size: 14px;
-  }
-  #toolbar h3 { margin: 0 0 8px 0; font-size: 16px; color: #4caf50; }
-  #toolbar button {
-    display: block; margin: 5px 0; padding: 6px 14px;
-    background: #2c7a4b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;
-  }
-  #toolbar button:hover { background: #3d9b5c; }
-  #legend {
-    position: absolute; bottom: 30px; right: 10px; z-index: 100;
-    background: rgba(0,0,0,0.7); color: white; padding: 10px 15px;
-    border-radius: 8px; font-family: 'Microsoft YaHei', sans-serif; font-size: 13px;
-  }
-  .legend-item { margin: 4px 0; }
-  .legend-color { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
-  #statusBar {
-    position: absolute; bottom: 10px; left: 10px; z-index: 100;
-    background: rgba(0,0,0,0.5); color: #aaa; padding: 4px 10px;
-    border-radius: 4px; font-size: 11px; font-family: monospace;
-  }
-</style>
-<!-- Cesium JS -->
-<script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
-<link href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>天眼寻珍 · 3D 土地资源工作台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.114/Build/Cesium/Widgets/widgets.css">
+    <link rel="stylesheet" href="vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026/Build/SuperMap3D/Widgets/widgets.css">
+    <style>
+        :root {
+            --bg: #07100f;
+            --surface: #0d1916;
+            --surface-2: #12211d;
+            --surface-3: #172a24;
+            --line: rgba(174, 207, 193, .16);
+            --line-strong: rgba(174, 207, 193, .28);
+            --text: #edf3ef;
+            --muted: #a8bbb1;
+            --faint: #71837a;
+            --green: #74d6a5;
+            --cyan: #69c7d2;
+            --amber: #e6b56d;
+            --danger: #ec8980;
+            --shadow: 0 18px 42px rgba(0, 0, 0, .28);
+        }
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+        body { background: var(--bg); color: var(--text); font: 13px/1.5 "Noto Sans SC", sans-serif; }
+        button, select, textarea { font: inherit; }
+        button { cursor: pointer; }
+        button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+        .app { width: 100%; height: 100%; display: grid; grid-template-columns: 286px minmax(0, 1fr); }
+        .sidebar { display: flex; flex-direction: column; min-width: 0; background: var(--surface); border-right: 1px solid var(--line); }
+        .brand { display: flex; gap: 12px; align-items: center; padding: 20px 18px; border-bottom: 1px solid var(--line); }
+        .brand-mark { display: grid; place-items: center; width: 36px; height: 36px; color: var(--green); border: 1px solid rgba(116,214,165,.35); border-radius: 8px; background: #10231d; }
+        .brand strong { display: block; font-size: 14px; letter-spacing: .02em; }
+        .brand span { display: block; margin-top: 2px; color: var(--faint); font-size: 11px; }
+        .side-content { min-height: 0; overflow: auto; padding: 16px; }
+        .section-label { margin: 0 0 8px; color: var(--faint); font: 600 10px/1.2 "Plus Jakarta Sans", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+        .scene-select, .field, .json-input { width: 100%; color: var(--text); border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+        .scene-select, .field { min-height: 38px; padding: 8px 10px; }
+        .scene-select { margin-bottom: 10px; }
+        .toolbar { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; margin-bottom: 18px; }
+        .tool-button, .icon-button, .primary-button, .ghost-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; background: transparent; transition: color .18s ease, background .18s ease, border-color .18s ease; }
+        .tool-button { padding: 7px 8px; font-size: 11px; }
+        .terrain-view-button { grid-column: 1 / -1; }
+        .icon-button { width: 38px; padding: 0; }
+        .primary-button { padding: 8px 12px; color: #07100f; border-color: var(--green); background: var(--green); font-weight: 700; }
+        .ghost-button { padding: 7px 10px; }
+        .tool-button:hover, .icon-button:hover, .ghost-button:hover { color: var(--text); border-color: var(--line-strong); background: var(--surface-3); }
+        .primary-button:hover { background: #91e4ba; }
+        .service-summary { padding: 12px 0 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .status-line { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+        .status-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--faint); }
+        .status-dot.online { background: var(--green); box-shadow: 0 0 0 4px rgba(116,214,165,.12); }
+        .status-dot.warn { background: var(--amber); }
+        .status-dot.error { background: var(--danger); }
+        .service-name { margin: 7px 0 0 15px; color: var(--text); font: 11px/1.4 "Plus Jakarta Sans", sans-serif; overflow-wrap: anywhere; }
+        .kv-list { margin: 10px 0 0; }
+        .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(174,207,193,.08); }
+        .kv:last-child { border-bottom: 0; }
+        .kv dt { color: var(--faint); }
+        .kv dd { margin: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
+        .layer-list { display: grid; gap: 7px; margin: 0 0 18px; }
+        .layer-row { display: grid; grid-template-columns: 16px minmax(0,1fr); gap: 7px; align-items: start; padding: 8px 9px; border: 1px solid var(--line); border-radius: 6px; background: rgba(18,33,29,.55); }
+        .layer-row input { accent-color: var(--green); margin-top: 3px; }
+        .layer-row strong { display: block; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+        .layer-row small { display: block; margin-top: 2px; color: var(--faint); font-size: 10px; }
+        .main { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: 66px minmax(0,1fr) 32px; grid-template-areas: "topbar" "map" "status"; overflow: hidden; }
+        .topbar { grid-area: topbar; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 20px; border-bottom: 1px solid var(--line); background: rgba(13,25,22,.94); }
+        .topbar h1 { margin: 0; font-size: 17px; letter-spacing: .01em; }
+        .topbar p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+        .topbar-actions { display: flex; gap: 8px; align-items: center; }
+        .chip { display: inline-flex; gap: 7px; align-items: center; min-height: 32px; padding: 6px 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-size: 11px; white-space: nowrap; }
+        .chip i { color: var(--green); }
+        .map-stage { grid-area: map; position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #0a1513; }
+        #cesium-container { position: absolute; inset: 0; }
+        .engine-fallback { position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(7,16,15,.94); }
+        .engine-fallback[hidden] { display: none; }
+        .engine-fallback-body { width: min(500px, 100%); padding: 22px; border-left: 2px solid var(--amber); background: var(--surface); box-shadow: var(--shadow); }
+        .engine-fallback-body i { color: var(--amber); font-size: 22px; }
+        .engine-fallback-body strong { display: block; margin-top: 12px; font-size: 16px; }
+        .engine-fallback-body p { margin: 8px 0 16px; color: var(--muted); font-size: 12px; }
+        .fallback-meta { display: grid; grid-template-columns: 96px minmax(0,1fr); gap: 7px 12px; margin: 0 0 18px; font-size: 11px; }
+        .fallback-meta dt { color: var(--faint); }
+        .fallback-meta dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+        .fallback-link { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 7px 10px; color: var(--text); border: 1px solid var(--line-strong); border-radius: 6px; text-decoration: none; background: var(--surface-2); }
+        .fallback-link:hover { border-color: var(--cyan); background: var(--surface-3); }
+        .map-overlay { position: absolute; z-index: 5; left: 18px; top: 18px; max-width: 310px; padding: 13px 14px; border-left: 2px solid var(--green); background: rgba(7,16,15,.88); box-shadow: var(--shadow); pointer-events: none; }
+        .map-overlay strong { display: block; font-size: 13px; }
+        .map-overlay span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+        .map-controls { position: absolute; z-index: 5; right: 18px; top: 18px; display: grid; gap: 6px; }
+        .map-controls .icon-button { color: var(--text); background: rgba(7,16,15,.86); }
+        .map-controls .icon-button[aria-pressed="true"] { color: var(--green); border-color: rgba(116,214,165,.5); }
+        .map-legend { position: absolute; z-index: 5; left: 18px; bottom: 18px; display: flex; gap: 12px; padding: 8px 10px; color: var(--muted); border: 1px solid var(--line); background: rgba(7,16,15,.82); font-size: 10px; }
+        .legend-dot { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; vertical-align: 0; }
+        .inspector { grid-area: inspector; min-width: 0; min-height: 0; overflow: auto; border-left: 1px solid var(--line); background: var(--surface); }
+        .inspector-section { padding: 16px; border-bottom: 1px solid var(--line); }
+        .inspector-section h2 { margin: 0; font-size: 13px; }
+        .section-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 11px; }
+        .section-head span { color: var(--faint); font-size: 10px; }
+        .native-tools { display: grid; gap: 7px; }
+        .native-tool { display: grid; grid-template-columns: 24px minmax(0,1fr) auto; gap: 8px; align-items: center; width: 100%; padding: 8px; text-align: left; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+        .native-tool:hover { color: var(--text); border-color: var(--line-strong); background: var(--surface-3); }
+        .native-tool .tool-icon { display: grid; place-items: center; width: 24px; height: 24px; color: var(--cyan); border-radius: 5px; background: rgba(105,199,210,.12); }
+        .native-tool strong { display: block; font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
+        .native-tool small { display: block; margin-top: 1px; color: var(--faint); font-size: 9px; }
+        .native-tool em { color: var(--green); font-size: 10px; font-style: normal; }
+        .empty { padding: 12px 0; color: var(--faint); font-size: 11px; }
+        .result-box { color: var(--muted); font-size: 11px; }
+        .result-box pre { max-height: 180px; margin: 10px 0 0; padding: 9px; overflow: auto; color: #c8d8ce; border: 1px solid var(--line); border-radius: 5px; background: #08110f; font: 10px/1.5 "Plus Jakarta Sans", monospace; white-space: pre-wrap; word-break: break-word; }
+        .statusbar { grid-area: status; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; color: var(--faint); border-top: 1px solid var(--line); background: var(--surface); font: 10px/1.2 "Plus Jakarta Sans", sans-serif; }
+        dialog { width: min(620px, calc(100vw - 32px)); color: var(--text); border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); }
+        dialog::backdrop { background: rgba(0,0,0,.65); }
+        .dialog-head, .dialog-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; }
+        .dialog-head { border-bottom: 1px solid var(--line); }
+        .dialog-head h2 { margin: 0; font-size: 14px; }
+        .dialog-body { padding: 16px; }
+        .dialog-body label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; }
+        .json-input { min-height: 180px; resize: vertical; padding: 10px; font: 11px/1.5 "Plus Jakarta Sans", monospace; }
+        .dialog-foot { justify-content: flex-end; border-top: 1px solid var(--line); }
+        .toast { position: fixed; z-index: 20; right: 18px; bottom: 46px; max-width: min(380px, calc(100vw - 36px)); padding: 10px 12px; color: var(--text); border: 1px solid var(--line-strong); border-radius: 6px; background: #13251f; box-shadow: var(--shadow); }
+        @media (min-width: 1220px) { .main { grid-template-columns: minmax(0,1fr) 320px; grid-template-areas: "topbar topbar" "map inspector" "status status"; } }
+        @media (max-width: 1219px) { .main { grid-template-columns: minmax(0,1fr); } .inspector { position: absolute; z-index: 8; top: 66px; right: 0; bottom: 32px; width: min(340px, 86vw); box-shadow: var(--shadow); transform: translateX(100%); transition: transform .2s ease; } .inspector.is-open { transform: translateX(0); } .topbar-actions .chip { display: none; } }
+        .mobile-inspector-toggle { display: none; }
+        @media (max-width: 700px) { .app { grid-template-columns: 1fr; } .sidebar { display: none; } .topbar { padding: 0 12px; } .topbar h1 { font-size: 14px; } .map-overlay { left: 10px; top: 10px; } .map-controls { right: 10px; top: 10px; } .mobile-inspector-toggle { display: inline-flex; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+    </style>
 </head>
 <body>
-<div id="cesiumContainer"></div>
-
-<div id="toolbar">
-  <h3>天眼寻珍·苍穹</h3>
-  <button onclick="flyToLuonan()">洛南县全景</button>
-  <button onclick="flyToTop1()">候选乡镇 #1</button>
-  <button onclick="toggleTerrain()">地形 ×2</button>
-  <button onclick="toggleResults()">分析结果</button>
-  <button onclick="loadDemoData()">加载演示数据</button>
-  <p style="font-size:11px;margin:8px 0 0;color:#aaa;">
-    地形: Cesium World Terrain<br>
-    .sct 地形需在 iDesktopX 生成
-  </p>
+<div class="app">
+    <aside class="sidebar" aria-label="三维场景管理">
+        <div class="brand"><div class="brand-mark"><i class="fa-solid fa-cube"></i></div><div><strong>3D 土地资源工作台</strong><span>SuperMap Realspace</span></div></div>
+        <div class="side-content">
+            <p class="section-label">场景服务</p>
+            <select class="scene-select" id="scene-select" aria-label="选择三维服务"><option>正在读取 iServer 服务…</option></select>
+            <div class="toolbar">
+                <button class="tool-button" id="refresh-scenes" type="button"><i class="fa-solid fa-rotate"></i>刷新</button>
+                <button class="tool-button" id="open-rest" type="button"><i class="fa-solid fa-arrow-up-right-from-square"></i>REST</button>
+                <button class="tool-button" id="back-2d" type="button"><i class="fa-solid fa-map"></i>返回二维</button>
+                <button class="tool-button" id="toggle-inspector" type="button"><i class="fa-solid fa-list"></i>检查器</button>
+            </div>
+            <div class="service-summary">
+                <div class="status-line"><span class="status-dot" id="service-dot"></span><span id="service-status">正在检查 iServer</span></div>
+                <p class="service-name" id="service-name">--</p>
+                <dl class="kv-list">
+                    <div class="kv"><dt>场景</dt><dd id="scene-resource">--</dd></div>
+                    <div class="kv"><dt>数据</dt><dd id="dataset-name">--</dd></div>
+                    <div class="kv"><dt>类型</dt><dd id="dataset-type">--</dd></div>
+                </dl>
+            </div>
+            <p class="section-label" style="margin-top:18px">地形图层</p>
+            <div class="layer-list" id="layer-list"><div class="empty">读取场景后显示图层</div></div>
+            <button class="tool-button" id="locate-terrain" type="button" title="定位到地形图层范围"><i class="fa-solid fa-location-crosshairs"></i>定位地形</button>
+            <p class="section-label">显示控制</p>
+            <div class="toolbar">
+                <button class="tool-button terrain-view-button" id="terrain-perspective" type="button" title="切换到立体地形视角"><i class="fa-solid fa-mountain-sun"></i>立体视角</button>
+                <button class="tool-button" id="terrain-up" type="button"><i class="fa-solid fa-mountain-sun"></i>地形 ×2</button>
+                <button class="tool-button" id="terrain-down" type="button"><i class="fa-solid fa-mountain"></i>地形 ×1</button>
+            </div>
+        </div>
+    </aside>
+    <main class="main">
+        <header class="topbar">
+            <div><h1>三维场景与土地评估验证</h1><p id="headline-status">正在加载真实 iServer Realspace 场景</p></div>
+            <div class="topbar-actions"><span class="chip"><i class="fa-solid fa-satellite-dish"></i><span id="engine-status">引擎准备中</span></span><button class="icon-button mobile-inspector-toggle" id="toggle-inspector-mobile" type="button" aria-label="检查器" title="检查器"><i class="fa-solid fa-list"></i></button><a class="ghost-button" href="index.html" style="text-decoration:none"><i class="fa-solid fa-house"></i>工作台</a></div>
+        </header>
+        <section class="map-stage">
+            <div id="cesium-container" aria-label="三维地图"></div>
+            <div class="engine-fallback" id="engine-fallback" hidden>
+                <div class="engine-fallback-body">
+                    <i class="fa-solid fa-cube" aria-hidden="true"></i>
+                    <strong>三维运行库尚未加载</strong>
+                    <p id="fallback-message">场景配置已读取，当前显示服务信息。配置 SuperMap3D 客户端后即可打开真实 SCT 地形。</p>
+                    <dl class="fallback-meta">
+                        <dt>场景</dt><dd id="fallback-scene">--</dd>
+                        <dt>地形数据</dt><dd id="fallback-dataset">--</dd>
+                        <dt>资源类型</dt><dd id="fallback-type">--</dd>
+                    </dl>
+                    <a class="fallback-link" id="fallback-rest" href="#" target="_blank" rel="noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i>打开 iServer 场景资源</a>
+                </div>
+            </div>
+            <div class="map-overlay"><strong id="map-title">洛南县 · Realspace</strong><span id="map-subtitle">SCT 地形图层等待加载</span></div>
+            <div class="map-controls" aria-label="地图控制">
+                <button class="icon-button" id="home-view" type="button" aria-label="定位场景" title="定位场景"><i class="fa-solid fa-crosshairs"></i></button>
+                <button class="icon-button" id="tilt-view" type="button" aria-label="立体地形视角" title="立体地形视角"><i class="fa-solid fa-arrows-up-down"></i></button>
+                <button class="icon-button" id="scene-mode" type="button" aria-label="切换球体模式" title="切换球体模式"><i class="fa-solid fa-globe"></i></button>
+            </div>
+            <div class="map-legend"><span><i class="legend-dot" style="background:var(--green)"></i>Realspace</span><span><i class="legend-dot" style="background:var(--cyan)"></i>分析结果</span><span><i class="legend-dot" style="background:var(--amber)"></i>场景信息</span></div>
+        </section>
+        <aside class="inspector" id="inspector" aria-label="三维检查器">
+            <section class="inspector-section"><div class="section-head"><h2>已发布场景</h2><span id="scene-count">0 个</span></div><div id="scene-list" class="layer-list"><div class="empty">等待服务目录</div></div></section>
+            <section class="inspector-section"><div class="section-head"><h2>iServer 三维分析工具</h2><span id="native-count">读取中</span></div><div id="native-tools" class="native-tools"><div class="empty">正在读取空间分析目录</div></div></section>
+            <section class="inspector-section"><div class="section-head"><h2>阶段结果</h2><span id="result-state">暂无</span></div><div id="result-box" class="result-box">运行工具后的资源 ID 和服务响应会显示在这里。</div></section>
+        </aside>
+        <footer class="statusbar"><span id="statusbar-text">就绪</span><span id="coordinate-text">洛南县 · EPSG:4326</span></footer>
+    </main>
 </div>
-
-<div id="legend" style="display:none;">
-  <div class="legend-item"><span class="legend-color" style="background:#4caf50"></span>S级适生区 (≥85)</div>
-  <div class="legend-item"><span class="legend-color" style="background:#8bc34a"></span>A级适生区 (75-85)</div>
-  <div class="legend-item"><span class="legend-color" style="background:#ff9800"></span>候选设施区</div>
-  <div class="legend-item"><span class="legend-color" style="background:#2196f3"></span>乡镇边界</div>
-</div>
-
-<div id="statusBar">就绪 | 洛南县 (34.09°N, 110.15°E)</div>
-
+<dialog id="native-dialog">
+    <form method="dialog" id="native-form">
+        <div class="dialog-head"><h2 id="native-dialog-title">运行 iServer 三维工具</h2><button class="icon-button" value="cancel" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="dialog-body"><label for="native-parameters">原生 REST 参数 JSON</label><textarea class="json-input" id="native-parameters" spellcheck="false"></textarea><label for="native-dataset-path" style="margin-top:12px">数据资源路径（数据算子需要）</label><input class="field" id="native-dataset-path" placeholder="从空间分析目录选择或粘贴路径"></div>
+        <div class="dialog-foot"><button class="ghost-button" value="cancel">取消</button><button class="primary-button" value="default"><i class="fa-solid fa-play"></i>执行</button></div>
+    </form>
+</dialog>
+<div id="toast" class="toast" hidden></div>
+<script src="auth.js"></script>
 <script>
-// ============================================================
-// Cesium 初始化
-// ============================================================
-Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1jMWMxMjRiYzRhNGIiLCJpZCI6MjU5LCJpYXQiOjE2OTUzMjY5Njd9.bIon9HXwBQ_kqYBK3_8KkUT_uYFw0mYDCOkGXfV_qEo';
-
-const viewer = new Cesium.Viewer('cesiumContainer', {
-  terrain: Cesium.Terrain.fromWorldTerrain(),
-  animation: false,
-  timeline: false,
-  baseLayerPicker: false,
-  fullscreenButton: false,
-  homeButton: false,
-  sceneModePicker: true,
-  navigationHelpButton: false,
-  geocoder: false,
-  infoBox: false,
-  selectionIndicator: false,
-});
-
-// 隐藏默认 UI
-viewer._cesiumWidget._creditContainer.style.display = 'none';
-
-// 洛南县中心
-const LUONAN_CENTER = Cesium.Cartesian3.fromDegrees(110.15, 34.09, 15000);
-let terrainExaggeration = 1.0;
-let resultsVisible = false;
-let demoDataLoaded = false;
-
-// ============================================================
-// 飞行动画
-// ============================================================
-function flyToLuonan() {
-  viewer.camera.flyTo({
-    destination: LUONAN_CENTER,
-    orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-45), roll: 0 },
-    duration: 2,
-  });
-}
-
-function flyToTop1() {
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(110.18, 34.12, 3000),
-    orientation: { heading: Cesium.Math.toRadians(30), pitch: Cesium.Math.toRadians(-35), roll: 0 },
-    duration: 2,
-  });
-}
-
-function toggleTerrain() {
-  terrainExaggeration = terrainExaggeration === 1.0 ? 2.0 : 1.0;
-  viewer.scene.verticalExaggeration = terrainExaggeration;
-  document.getElementById('statusBar').textContent =
-    `地形夸张: ${terrainExaggeration}x | 洛南县 (34.09°N, 110.15°E)`;
-}
-
-// ============================================================
-// 分析结果叠加
-// ============================================================
-let dataSources = [];
-
-async function loadDemoData() {
-  if (demoDataLoaded) return;
-  demoDataLoaded = true;
-
-  document.getElementById('statusBar').textContent = '加载演示数据中...';
-  document.getElementById('legend').style.display = 'block';
-
-  try {
-    // 从 FastAPI 获取筛选结果
-    const resp = await fetch('http://127.0.0.1:8000/api/golden-standards/list');
-    const standards = await resp.json();
-
-    if (standards.length === 0) {
-      // 无金标准时加载模拟数据
-      loadMock3DData();
-      return;
+(function () {
+    "use strict";
+    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 1, nativeCatalog: null, activeOperation: null, toastTimer: null };
+    const SAFE_CAMERA_HEIGHT = 7200;
+    const $ = (id) => document.getElementById(id);
+    const knownOperationHints = { geometryBuffer3D: "三维缓冲区", geometry3DMinDistance: "三维最短距离", geometryViewShedBody: "三维可视域", geometrySkylineSectorBody: "天际线扇区", geometryDrone3DGridPathPlanning: "无人机三维网格路径规划" };
+    function setStatus(text) { $("statusbar-text").textContent = text; $("headline-status").textContent = text; }
+    function toast(message) { const el = $("toast"); el.textContent = message; el.hidden = false; clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, 3600); }
+    async function api(path, options = {}) {
+        const hasToken = Boolean(window.Auth?.getToken?.());
+        const response = hasToken && window.Auth?.fetch ? await Auth.fetch(path, options) : await fetch(path, options);
+        if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            const error = new Error(detail.detail || `接口返回 ${response.status}`);
+            error.status = response.status;
+            throw error;
+        }
+        return response.json();
     }
-
-    // 使用第一个金标准启动筛选
-    const scrResp = await fetch('http://127.0.0.1:8000/api/screening/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        golden_standard_id: standards[0].id,
-        county: '洛南县',
-        top_n: 5,
-      }),
-    });
-    const screening = await scrResp.json();
-    renderScreening3D(screening);
-  } catch (e) {
-    console.log('FastAPI 未连接，加载模拟三维数据:', e.message);
-    loadMock3DData();
-  }
-}
-
-function loadMock3DData() {
-  // 模拟洛南县乡镇多边形
-  const towns = [
-    { name: '城关街道', lon: 110.15, lat: 34.09, score: 82.3, color: '#4caf50' },
-    { name: '永丰镇', lon: 110.20, lat: 34.12, score: 78.6, color: '#8bc34a' },
-    { name: '保安镇', lon: 110.10, lat: 34.06, score: 75.1, color: '#8bc34a' },
-    { name: '景村镇', lon: 110.18, lat: 34.04, score: 71.8, color: '#ff9800' },
-    { name: '石门镇', lon: 110.22, lat: 34.10, score: 69.4, color: '#ff9800' },
-  ];
-
-  const dataSource = new Cesium.CustomDataSource('lunnanDemo');
-  towns.forEach((t, i) => {
-    // 乡镇标记（柱状体表示评分）
-    dataSource.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.score * 20),
-      cylinder: {
-        length: t.score * 20,
-        topRadius: 300,
-        bottomRadius: 300,
-        material: Cesium.Color.fromCssColorString(t.color).withAlpha(0.7),
-      },
-      label: {
-        text: `${t.name}\n${t.score}分`,
-        font: '14px Microsoft YaHei',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -20),
-      },
-    });
-
-    // 乡镇范围椭圆
-    dataSource.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat),
-      ellipse: {
-        semiMinorAxis: 1500,
-        semiMajorAxis: 2000,
-        material: Cesium.Color.fromCssColorString(t.color).withAlpha(0.15),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(t.color).withAlpha(0.6),
-        outlineWidth: 2,
-      },
-    });
-  });
-
-  viewer.dataSources.add(dataSource);
-  dataSources.push(dataSource);
-  viewer.flyTo(dataSource);
-
-  document.getElementById('statusBar').textContent =
-    '模拟数据已加载 | 洛南县 Top 5 候选乡镇';
-}
-
-function renderScreening3D(screening) {
-  const dataSource = new Cesium.CustomDataSource('screeningResults');
-  const towns = screening.towns || [];
-
-  towns.forEach((t, i) => {
-    const color = t.overall_score >= 80 ? '#4caf50'
-                : t.overall_score >= 70 ? '#8bc34a'
-                : '#ff9800';
-
-    dataSource.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(110.15 + i * 0.03, 34.09 + i * 0.01, t.overall_score * 20),
-      cylinder: {
-        length: t.overall_score * 20,
-        topRadius: 300,
-        bottomRadius: 300,
-        material: Cesium.Color.fromCssColorString(color).withAlpha(0.7),
-      },
-      label: {
-        text: `${t.town_name}\n${t.overall_score}分`,
-        font: '14px Microsoft YaHei',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -20),
-      },
-    });
-  });
-
-  viewer.dataSources.add(dataSource);
-  dataSources.push(dataSource);
-  viewer.flyTo(dataSource);
-
-  document.getElementById('statusBar').textContent =
-    `筛选结果已加载 | ${towns.length} 个候选乡镇`;
-}
-
-function toggleResults() {
-  dataSources.forEach(ds => ds.show = !ds.show);
-  resultsVisible = !resultsVisible;
-  document.getElementById('legend').style.display = resultsVisible ? 'block' : 'none';
-}
-
-// ============================================================
-// 初始飞行
-// ============================================================
-flyToLuonan();
-loadDemoData();
-
-// ============================================================
-// SuperMap .sct 地形接入（当 iDesktopX 生成后替换）
-// ============================================================
-// 步骤: iDesktopX → 右键DEM → 生成缓存(.sct) → 发布到 iServer REST-3D
-// 然后取消下方注释即可切换为洛南县真实地形
-
-let usingSuperMapTerrain = false;
-
-async function loadSuperMapTerrain() {
-  const terrainUrl = 'http://localhost:8090/iserver/services/3D-luonan/rest/realspace/datas/LuonanDEM';
-  try {
-    const resp = await fetch(terrainUrl, { method: 'HEAD' });
-    if (!resp.ok) throw new Error('3D service not ready');
-    viewer.terrainProvider = new Cesium.CesiumTerrainProvider({ url: terrainUrl });
-    usingSuperMapTerrain = true;
-    document.getElementById('statusBar').textContent = 'SuperMap .sct 地形已激活 | 洛南县';
-    document.querySelector('#toolbar p').textContent = '地形: SuperMap .sct';
-  } catch (e) {
-    alert('.sct 地形未就绪。请先在 iDesktopX 中: 右键DEM → 生成缓存(.sct) → 发布到 iServer');
-  }
-}
-
-// 地形切换按钮（替代原 toggleTerrain）
-function toggleTerrain() {
-  if (!usingSuperMapTerrain) {
-    loadSuperMapTerrain().then(() => {
-      if (!usingSuperMapTerrain) {
-        terrainExaggeration = terrainExaggeration === 1.0 ? 2.0 : 1.0;
-        viewer.scene.verticalExaggeration = terrainExaggeration;
-      }
-    });
-  } else {
-    terrainExaggeration = terrainExaggeration === 1.0 ? 2.0 : 1.0;
-    viewer.scene.verticalExaggeration = terrainExaggeration;
-  }
-  document.getElementById('statusBar').textContent =
-    `地形夸张: ${terrainExaggeration}x | 洛南县 (34.09°N, 110.15°E)`;
-}
+    function selectedScene() { return state.scenes.find((item) => item.scene_name === $("scene-select").value) || state.scenes[0]; }
+    function isTerrainLayer(layer) { return Boolean(layer && (layer.layer3DType === "TerrainFileLayer" || layer.cacheType === "TIN" || layer.type === "TerrainFileLayer" || layer.cache_type === "TIN")); }
+    function updateSceneSummary(scene) {
+        if (!scene) return;
+        state.terrainLayerIndex = (scene.layers || []).findIndex(isTerrainLayer);
+        $("service-name").textContent = scene.service_name || "--";
+        $("scene-resource").textContent = scene.scenes?.[0]?.name || "默认场景";
+        const dataset = scene.datasets?.[0];
+        $("dataset-name").textContent = dataset?.name || scene.layers?.find((layer) => layer.dataName)?.dataName || "--";
+        $("dataset-type").textContent = dataset?.type || (scene.terrain_available ? "DEM / Terrain" : "--");
+        $("map-title").textContent = `${scene.scene_name || "三维场景"} · Realspace`;
+        $("map-subtitle").textContent = scene.terrain_available ? "SCT 地形图层已发布" : "未发现 TerrainFileLayer";
+        $("service-dot").className = `status-dot ${scene.terrain_available ? "online" : "warn"}`;
+        $("service-status").textContent = scene.terrain_available ? "iServer Realspace 在线" : "场景在线，未发现地形图层";
+        $("layer-list").innerHTML = (scene.layers || []).length ? scene.layers.map((layer, index) => `<label class="layer-row"><input type="checkbox" data-layer-index="${index}" ${layer.visible === false ? "" : "checked"}><span><strong>${layer.caption || layer.name || layer.dataName || `图层 ${index + 1}`}</strong><small>${layer.layer3DType || layer.cacheType || "Realspace 图层"}${layer.dataName ? ` · ${layer.dataName}` : ""}</small></span></label>`).join("") : '<div class="empty">场景没有返回图层</div>';
+        $("layer-list").querySelectorAll("input[data-layer-index]").forEach((input) => input.addEventListener("change", () => toggleLayer(Number(input.dataset.layerIndex), input.checked)));
+    }
+    function renderSceneList() {
+        $("scene-count").textContent = `${state.scenes.length} 个`;
+        $("scene-list").innerHTML = state.scenes.length ? state.scenes.map((scene) => `<button class="native-tool" data-scene="${scene.scene_name}"><span class="tool-icon"><i class="fa-solid fa-cube"></i></span><span><strong>${scene.scene_name}</strong><small>${scene.service_name} · ${scene.terrain_available ? "含 SCT 地形" : "无 TerrainFileLayer"}</small></span><em>${scene.terrain_available ? "在线" : "检查"}</em></button>`).join("") : '<div class="empty">iServer 未发布三维服务</div>';
+        $("scene-list").querySelectorAll("[data-scene]").forEach((button) => button.addEventListener("click", () => { $("scene-select").value = button.dataset.scene; loadSelectedScene(); }));
+    }
+    function populateSceneSelect() { $("scene-select").innerHTML = state.scenes.length ? state.scenes.map((scene) => `<option value="${scene.scene_name}">${scene.scene_name}</option>`).join("") : '<option>没有可用场景</option>'; }
+    async function loadScenes() {
+        try {
+            const payload = await api("/api/3d-services/scenes/list");
+            state.scenes = payload.scenes || [];
+            populateSceneSelect(); renderSceneList();
+            if (!state.scenes.length) { $("service-status").textContent = "iServer 未发布三维服务"; $("service-dot").className = "status-dot error"; setStatus("未发现 Realspace 服务"); return; }
+            await loadSelectedScene();
+        } catch (error) {
+            const authRequired = error.status === 401;
+            $("service-dot").className = `status-dot ${authRequired ? "warn" : "error"}`;
+            $("service-status").textContent = authRequired ? "请先登录后读取场景" : "iServer 连接失败";
+            setStatus(authRequired ? "请先登录后读取 iServer 三维服务" : (error.message || "场景服务读取失败"));
+            toast(authRequired ? "请先登录后读取 iServer 三维服务" : (error.message || "场景服务读取失败"));
+        }
+    }
+    async function loadSelectedScene() {
+        const scene = selectedScene(); if (!scene) return;
+        state.selected = scene; updateSceneSummary(scene); setStatus(`正在读取 ${scene.scene_name} 的 Realspace 配置`);
+        try { state.config = await api(`/api/3d-services/scenes/${encodeURIComponent(scene.scene_name)}/config`); updateSceneSummary({ ...scene, layers: state.config.layers || scene.layers }); applyCamera(); await openRealspace(); setStatus(`已连接 ${scene.service_name} · ${state.config.scene_resource || "默认场景"}`); }
+        catch (error) { setStatus(error.message || "场景配置读取失败"); toast(error.message || "场景配置读取失败"); }
+    }
+    function getEngine() { return window.SuperMap3D || window.Cesium; }
+    function loadScript(url, timeout = 7000) { return new Promise((resolve, reject) => { const script = document.createElement("script"); script.src = url; script.async = true; const timer = setTimeout(() => { script.remove(); reject(new Error("引擎资源超时")); }, timeout); script.onload = () => { clearTimeout(timer); resolve(); }; script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error("引擎资源不可用")); }; document.head.appendChild(script); }); }
+    function showEngineFallback(message) { const scene = state.selected || {}; const config = state.config || {}; $("engine-fallback").hidden = false; $("fallback-message").textContent = message; $("fallback-scene").textContent = config.scene_resource || scene.scenes?.[0]?.name || "默认场景"; $("fallback-dataset").textContent = scene.datasets?.[0]?.name || scene.layers?.[0]?.dataName || "--"; $("fallback-type").textContent = scene.layers?.[0]?.layer3DType || scene.layers?.[0]?.cacheType || "Realspace"; $("fallback-rest").href = config.scene_resource_url || config.scene_url || "#"; $("engine-status").textContent = "场景信息模式"; $("map-subtitle").textContent = "已读取 iServer 配置，等待 SuperMap3D 运行库"; }
+    function hideEngineFallback() { $("engine-fallback").hidden = true; }
+    async function ensureEngine() {
+        if (getEngine()) return getEngine();
+        // SuperMap 官方 WebGL CDN 已下线，如需真实 Realspace SCT 渲染，
+        // 请从 SuperMap 资源中心下载 iClient3D for WebGL 并自托管，
+        // 然后在页面中设置 window.SUPERMAP3D_URL 指向 Cesium.js。
+        const candidates = [
+            "vendor/supermap3d/SuperMap3D.js",
+            "vendor/supermap3d/Build/SuperMap3D/SuperMap3D.js",
+            "vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026/Build/SuperMap3D/SuperMap3D.js",
+            "vendor/supermap3d/Build/Cesium/Cesium.js",
+            "vendor/supermap3d/Cesium.js",
+        ];
+        if (window.SUPERMAP3D_URL) candidates.push(window.SUPERMAP3D_URL);
+        candidates.push("https://cdn.jsdelivr.net/npm/cesium@1.114/Build/Cesium/Cesium.js");
+        for (const url of candidates) { try { await loadScript(url); if (getEngine()) break; } catch (error) { console.warn("3D 引擎候选不可用", url, error); } }
+        state.engine = getEngine(); if (!state.engine) throw new Error("三维引擎资源不可用"); $("engine-status").textContent = state.engine === window.SuperMap3D ? "SuperMap3D" : "Cesium 兼容模式"; return state.engine;
+    }
+    function addReferenceImagery(viewer, engine) {
+        if (!viewer.imageryLayers || !engine.UrlTemplateImageryProvider) return;
+        const imageryUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+        try {
+            viewer.imageryLayers.addImageryProvider(new engine.UrlTemplateImageryProvider({ url: imageryUrl, maximumLevel: 19 }));
+        } catch (error) {
+            console.warn("影像底图不可用，保留 Realspace 地形", error);
+        }
+    }
+    function createViewer(engine) {
+        if (state.viewer) return state.viewer;
+        state.engine = engine;
+        state.viewer = new engine.Viewer("cesium-container", { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, infoBox: false, selectionIndicator: false, imageryProvider: false, terrainProvider: new engine.EllipsoidTerrainProvider() });
+        if (state.viewer._cesiumWidget?._creditContainer) state.viewer._cesiumWidget._creditContainer.style.display = "none";
+        addReferenceImagery(state.viewer, engine);
+        const cameraController = state.viewer.scene.screenSpaceCameraController;
+        if (cameraController) { cameraController.enableRotate = true; cameraController.enableTilt = true; cameraController.enableZoom = true; cameraController.enableLook = true; }
+        $("cesium-container").addEventListener("mousemove", (event) => { const rect = state.viewer.scene.canvas.getBoundingClientRect(); const cartesian = state.viewer.camera.pickEllipsoid(new state.engine.Cartesian2(event.clientX - rect.left, event.clientY - rect.top)); if (!cartesian) return; const cartographic = state.engine.Cartographic.fromCartesian(cartesian); $("coordinate-text").textContent = `${state.engine.Math.toDegrees(cartographic.longitude).toFixed(5)}, ${state.engine.Math.toDegrees(cartographic.latitude).toFixed(5)}`; });
+        return state.viewer;
+    }
+    async function createTerrainProvider(engine) {
+        if (!state.config?.terrain_url || engine !== window.SuperMap3D || typeof engine.SuperMapTerrainProvider !== "function") return null;
+        const provider = new engine.SuperMapTerrainProvider({ url: state.config.terrain_url, isSct: true, invisibility: true });
+        if (provider.readyPromise) await provider.readyPromise;
+        return provider;
+    }
+    function applyCamera() { if (!state.viewer || !state.config?.initial_view) return; const engine = state.engine; const view = state.config.initial_view; const height = Math.max(SAFE_CAMERA_HEIGHT, Number(view.height) * 4); state.viewer.camera.setView({ destination: engine.Cartesian3.fromDegrees(view.longitude, view.latitude, height), orientation: { heading: engine.Math.toRadians(view.heading || 0), pitch: engine.Math.toRadians(-35), roll: 0 } }); }
+    async function openRealspace() {
+        let engine;
+        try { engine = await ensureEngine(); } catch (error) { state.realspaceOpened = false; showEngineFallback(`三维引擎资源不可用：${error.message}`); return; }
+        hideEngineFallback(); const viewer = createViewer(engine); applyCamera();
+        viewer.terrainProvider = new engine.EllipsoidTerrainProvider();
+        state.terrainProvider = null;
+        state.terrainEnabled = false;
+        if (state.config?.terrain_url) {
+            try {
+                state.terrainProvider = await createTerrainProvider(engine);
+                if (state.terrainProvider) {
+                    viewer.terrainProvider = state.terrainProvider;
+                    state.terrainEnabled = true;
+                }
+            } catch (error) {
+                state.terrainProvider = null;
+                toast(`SCT 地形提供器加载失败：${error.message}`);
+            }
+        }
+        if (typeof viewer.scene.open === "function" && state.config?.scene_url) { try { await viewer.scene.open(state.config.scene_url); state.realspaceOpened = true; $("engine-status").textContent = "SuperMap Realspace"; $("map-subtitle").textContent = "真实 iServer SCT 场景已打开"; } catch (error) { state.realspaceOpened = false; showEngineFallback(`Realspace 打开失败：${error.message}`); toast(`Realspace 打开失败，保留场景信息：${error.message}`); } }
+        else { state.realspaceOpened = false; $("engine-status").textContent = "Cesium 兼容模式"; $("map-subtitle").textContent = "已读取 iServer 场景配置，等待 SuperMap3D 运行库"; }
+        if (state.terrainProvider && viewer.terrainProvider !== state.terrainProvider) viewer.terrainProvider = state.terrainProvider;
+        applyCamera();
+    }
+    function homeView() { if (!state.config?.initial_view || !state.viewer) return; applyCamera(); }
+    function terrainFocus() {
+        const bounds = state.config?.terrain_bounds || state.selected?.terrain_bounds;
+        if (bounds && [bounds.west, bounds.south, bounds.east, bounds.north].every((value) => Number.isFinite(Number(value)))) {
+            return { longitude: (Number(bounds.west) + Number(bounds.east)) / 2, latitude: (Number(bounds.south) + Number(bounds.north)) / 2 };
+        }
+        return state.config?.initial_view || { longitude: 110.15, latitude: 34.09 };
+    }
+    function setTerrainPerspective() {
+        if (!state.viewer || !state.engine) return;
+        const view = terrainFocus();
+        state.viewer.camera.flyTo({
+            destination: state.engine.Cartesian3.fromDegrees(view.longitude, view.latitude, Math.max(SAFE_CAMERA_HEIGHT * .72, Number(state.config?.initial_view?.height || 15000) * 2.5)),
+            orientation: { heading: state.engine.Math.toRadians(18), pitch: state.engine.Math.toRadians(-28), roll: 0 },
+            duration: 1.2,
+            complete: () => setStatus("三维地形视角"),
+        });
+    }
+    function locateTerrain() {
+        if (!state.viewer || !state.engine) return;
+        const bounds = state.config?.terrain_bounds || state.selected?.terrain_bounds;
+        if (!bounds) { homeView(); toast("iServer 未返回地形范围，已定位到场景中心"); return; }
+        const west = Number(bounds.west), south = Number(bounds.south), east = Number(bounds.east), north = Number(bounds.north);
+        if (![west, south, east, north].every(Number.isFinite) || west >= east || south >= north) {
+            homeView(); toast("地形范围无效，已定位到场景中心"); return;
+        }
+        const engine = state.engine;
+        setStatus("正在定位地形图层范围");
+        if (engine.Rectangle?.fromDegrees) {
+            state.viewer.camera.flyTo({
+                destination: engine.Rectangle.fromDegrees(west, south, east, north),
+                orientation: { heading: 0, pitch: engine.Math.toRadians(-38), roll: 0 },
+                duration: 1.2,
+                complete: () => setStatus("已定位到地形图层范围"),
+            });
+            return;
+        }
+        const centerLon = (west + east) / 2;
+        const centerLat = (south + north) / 2;
+        const meters = Math.max((east - west) * 111000 * Math.cos(engine.Math.toRadians(centerLat)), (north - south) * 111000);
+        state.viewer.camera.flyTo({
+            destination: engine.Cartesian3.fromDegrees(centerLon, centerLat, Math.max(SAFE_CAMERA_HEIGHT, meters * 1.4)),
+            orientation: { heading: 0, pitch: engine.Math.toRadians(-38), roll: 0 },
+            duration: 1.2,
+            complete: () => setStatus("已定位到地形图层范围"),
+        });
+    }
+    function setTilt() { setTerrainPerspective(); }
+    function setExaggeration(value) { state.exaggeration = value; if (state.viewer?.scene) { state.viewer.scene.terrainExaggeration = value; state.viewer.scene.verticalExaggeration = value; } $("terrain-up").setAttribute("aria-pressed", String(value === 2)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
+    function toggleLayer(index, visible) { const layer = state.viewer?.scene?.layers?.get(index); if (layer) layer.visible = visible; const source = state.selected?.layers?.[index]; if (source) source.visible = visible; setStatus(`${source?.caption || source?.name || "图层"} ${visible ? "已显示" : "已隐藏"}`); }
+    function toggleTerrain(visible, source) {
+        if (!state.viewer || !state.engine) return;
+        if (state.terrainProvider) {
+            state.viewer.terrainProvider = visible ? state.terrainProvider : new state.engine.EllipsoidTerrainProvider();
+            state.terrainEnabled = visible;
+            if (state.viewer.scene.requestRender) state.viewer.scene.requestRender();
+        }
+        const collection = state.viewer.scene?.layers;
+        const name = source?.name || source?.caption || source?.data_name || source?.dataName;
+        let layer = collection?.find && name ? collection.find(name) : null;
+        if (!layer && collection?.get && state.terrainLayerIndex >= 0) layer = collection.get(state.terrainLayerIndex);
+        if (layer && "visible" in layer) layer.visible = visible;
+        setStatus(`${source?.caption || source?.name || source?.data_name || "地形图层"} ${visible ? "已显示" : "已隐藏"}`);
+    }
+    function toggleLayer(index, visible) {
+        const source = state.config?.layers?.[index] || state.selected?.layers?.[index];
+        if (isTerrainLayer(source)) {
+            toggleTerrain(visible, source);
+            if (state.selected?.layers?.[index]) state.selected.layers[index].visible = visible;
+            return;
+        }
+        const layer = state.viewer?.scene?.layers?.get(index);
+        if (layer) layer.visible = visible;
+        if (source) source.visible = visible;
+        setStatus(`${source?.caption || source?.name || "图层"} ${visible ? "已显示" : "已隐藏"}`);
+    }
+    function renderNativeTools() {
+        const catalog = state.nativeCatalog || {}; const all = [...(catalog.geometry_operations || []), ...(catalog.dataset_operations || [])]; const sorted = all.sort((a, b) => Number(/3d|view|skyline|drone/i.test(b.name)) - Number(/3d|view|skyline|drone/i.test(a.name)));
+        $("native-count").textContent = `${all.length} 个已发现`;
+        $("native-tools").innerHTML = all.length ? sorted.map((op) => `<button class="native-tool" data-operation="${op.id}" data-path="${op.datasets?.[0]?.path || ""}"><span class="tool-icon"><i class="fa-solid ${/3d|view|skyline|drone/i.test(op.name) ? "fa-cube" : "fa-gears"}"></i></span><span><strong>${knownOperationHints[op.name] || op.name}</strong><small>${op.scope === "geometry" ? "几何算子" : `${op.datasets?.length || 0} 个数据资源`}</small></span><em>参数</em></button>`).join("") : '<div class="empty">iServer 未返回原生空间分析目录</div>';
+        $("native-tools").querySelectorAll("[data-operation]").forEach((button) => button.addEventListener("click", () => openNativeDialog(button.dataset.operation, button.dataset.path)));
+    }
+    async function loadNativeCatalog() { try { state.nativeCatalog = await api("/api/spatial-analysis/native-catalog"); renderNativeTools(); } catch (error) { $("native-count").textContent = "不可用"; $("native-tools").innerHTML = `<div class="empty">${error.message}</div>`; } }
+    function openNativeDialog(operationId, datasetPath) { state.activeOperation = { operationId, datasetPath }; $("native-dialog-title").textContent = `运行 ${knownOperationHints[operationId.split(":").pop()] || operationId}`; $("native-parameters").value = JSON.stringify({ geometry: { type: "POINT", points: [{ x: 110.15, y: 34.09 }] }, distance: 1000 }, null, 2); $("native-dataset-path").value = datasetPath || ""; $("native-dialog").showModal(); }
+    async function executeNative(event) { event.preventDefault(); if (!state.activeOperation) return; let parameters; try { parameters = JSON.parse($("native-parameters").value || "{}"); } catch { toast("参数必须是合法 JSON"); return; } const submit = $("native-form").querySelector("button[value='default']"); submit.disabled = true; $("result-state").textContent = "运行中"; try { const payload = await api("/api/spatial-analysis/native-execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation_id: state.activeOperation.operationId, parameters, dataset_path: $("native-dataset-path").value.trim() || state.activeOperation.datasetPath || null }) }); $("result-state").textContent = "完成"; $("result-box").innerHTML = `<strong>iServer 已返回结果</strong><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`; addResultMarker(); toast("三维分析工具执行完成"); $("native-dialog").close(); } catch (error) { $("result-state").textContent = "失败"; $("result-box").textContent = error.message; toast(error.message || "工具执行失败"); } finally { submit.disabled = false; } }
+    function addResultMarker() { if (!state.viewer || !state.engine || !state.config?.initial_view) return; const view = state.config.initial_view; state.viewer.entities.add({ position: state.engine.Cartesian3.fromDegrees(view.longitude, view.latitude, Math.max(50, view.height / 10)), point: { pixelSize: 12, color: state.engine.Color.fromCssColorString("#69c7d2"), outlineColor: state.engine.Color.WHITE, outlineWidth: 2 }, label: { text: "分析结果", fillColor: state.engine.Color.WHITE, showBackground: true, backgroundColor: state.engine.Color.fromCssColorString("#0d1916").withAlpha(.9), pixelOffset: new state.engine.Cartesian2(0, -18) } }); }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])); }
+    $("scene-select").addEventListener("change", loadSelectedScene); $("refresh-scenes").addEventListener("click", loadScenes); $("open-rest").addEventListener("click", () => { if (state.config?.scene_resource_url) window.open(state.config.scene_resource_url, "_blank", "noopener"); }); $("back-2d").addEventListener("click", () => { window.location.href = "index.html"; }); $("toggle-inspector").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("toggle-inspector-mobile").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("home-view").addEventListener("click", homeView); $("locate-terrain").addEventListener("click", locateTerrain); $("terrain-perspective").addEventListener("click", setTerrainPerspective); $("tilt-view").addEventListener("click", setTilt); $("scene-mode").addEventListener("click", () => { if (!state.viewer || !state.engine) return; state.viewer.scene.morphTo2D(0.7); }); $("terrain-up").addEventListener("click", () => setExaggeration(2)); $("terrain-down").addEventListener("click", () => setExaggeration(1)); $("native-form").addEventListener("submit", (event) => { if (event.submitter?.value === "cancel") { state.activeOperation = null; return; } executeNative(event); });
+    loadNativeCatalog(); loadScenes();
+})();
 </script>
 </body>
 </html>

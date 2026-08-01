@@ -1516,7 +1516,13 @@
             else runTool(action, options);
         });
         $("view-2d").addEventListener("click", () => setView("2d"));
-        $("view-3d").addEventListener("click", () => setView("3d"));
+        $("view-3d").addEventListener("click", () => {
+            if (!state.capabilities?.realspace_available) {
+                toast("当前 iServer 未发布 Realspace 三维服务", "error");
+                return;
+            }
+            window.location.href = "map3d.html";
+        });
     }
 
     function initAuthState() {

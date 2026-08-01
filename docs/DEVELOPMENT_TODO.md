@@ -1,12 +1,12 @@
 # 天眼寻珍·苍穹 - 后续开发计划备忘录
 
 **创建时间**: 2026-07-26
-**状态**: ✅ 部分完成（iServer深度集成 + 三维场景准备）
-**最后更新**: 2026-07-27
+**状态**: ✅ 部分完成（iServer深度集成 + 3D Realspace 工作台）
+**最后更新**: 2026-08-01
 
 ---
 
-## 🎉 已完成工作（2026-07-27）
+## 🎉 已完成工作
 
 ### ✅ 第1个月：iServer深度集成（Week 1-4）
 - ✅ Week 1-2: 补充空间分析API（坡度、密度、叠加、插值）
@@ -16,7 +16,16 @@
 ### ✅ 第3个月：完善和三维（Week 9-11）
 - ✅ Week 9: 数据管理完善（属性表、多格式导入导出）
 - ✅ Week 10-11: 三维场景准备（地形、模型上传）
-- 🔄 Week 12: 测试和优化（进行中）
+- ✅ Week 12: 测试和优化
+
+### ✅ 3D Realspace 工作台（2026-07-27 → 08-01）
+- ✅ `frontend/map3d.html` 全新深色科技风 3D 决策视图（Cesium 1.114 / SuperMap3D 引擎自适应）
+- ✅ `server/api/scene_3d.py` 重构：场景/数据集目录解析、SCT TerrainFileLayer 检测、相机视角从场景自动读取
+- ✅ `server/services/land_assessment.py` 能力检测：`dem_available` / `realspace_available` / `3d_scenes`
+- ✅ `server/integrations/iserver_client.py` 服务名规范化（兼容 `name/rest` 格式）
+- ✅ `frontend/land-workbench.js` 3D 入口：检测到 Realspace 服务后才跳转
+- ✅ `scripts/prepare-3d-workspace.ps1` / `prepare_3d_workspace.py`：一键生成 3D 工作区（DEM → UDBX 网格、SMWU 工作空间、可选 OSM 导入）
+- 🔄 待办：等待 iServer 端实际发布 3D 场景后，用真实 SCT 地形缓存联调 Realspace 渲染
 
 ### 📊 成果统计
 - 新增API接口：**34个**
@@ -24,6 +33,7 @@
 - iServer功能利用率：20% → **85%**
 - 详细报告：[ISERVER_INTEGRATION_REPORT.md](./ISERVER_INTEGRATION_REPORT.md)
 - 测试清单：[API_TESTING_CHECKLIST.md](./API_TESTING_CHECKLIST.md)
+- 项目总览：[README.md](../README.md)
 
 ---
 

@@ -39,6 +39,7 @@ database/*.backup
 data/users/
 data/snapshots/
 data/gee_cache/
+data/3d/
 data/uploads/
 data/outputs/*
 !data/outputs/.gitkeep
@@ -50,3 +51,5 @@ dist/
 build/
 coverage/
 *.tgz
+
+frontend/vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026
