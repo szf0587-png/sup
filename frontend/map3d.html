@@ -316,10 +316,38 @@
         return state.viewer;
     }
     async function createTerrainProvider(engine) {
-        if (!state.config?.terrain_url || engine !== window.SuperMap3D || typeof engine.SuperMapTerrainProvider !== "function") return null;
-        const provider = new engine.SuperMapTerrainProvider({ url: state.config.terrain_url, isSct: true, invisibility: true });
-        if (provider.readyPromise) await provider.readyPromise;
-        return provider;
+        // 优先使用iServer SCT地形（真实洛南县地形）
+        if (state.config?.terrain_url && engine === window.SuperMap3D && typeof engine.SuperMapTerrainProvider === "function") {
+            try {
+                const provider = new engine.SuperMapTerrainProvider({
+                    url: state.config.terrain_url,
+                    isSct: true,
+                    invisibility: true
+                });
+                if (provider.readyPromise) await provider.readyPromise;
+                console.log('[3D] 使用 iServer SCT 地形:', state.config.terrain_url);
+                return provider;
+            } catch (error) {
+                console.warn('[3D] iServer SCT 地形加载失败，尝试降级:', error);
+            }
+        }
+
+        // 降级方案1：Cesium World Terrain（全球地形）
+        if (engine.createWorldTerrainAsync || engine.createWorldTerrain) {
+            try {
+                const createFn = engine.createWorldTerrainAsync || engine.createWorldTerrain;
+                const provider = await createFn.call(engine);
+                console.log('[3D] 使用 Cesium World Terrain（在线地形）');
+                toast('已启用 Cesium 在线地形（非洛南真实地形）', 'info');
+                return provider;
+            } catch (error) {
+                console.warn('[3D] Cesium World Terrain 加载失败:', error);
+            }
+        }
+
+        // 降级方案2：平面地球
+        console.log('[3D] 无可用地形，使用平面模式');
+        return null;
     }
     function applyCamera() { if (!state.viewer || !state.config?.initial_view) return; const engine = state.engine; const view = state.config.initial_view; const height = Math.max(SAFE_CAMERA_HEIGHT, Number(view.height) * 4); state.viewer.camera.setView({ destination: engine.Cartesian3.fromDegrees(view.longitude, view.latitude, height), orientation: { heading: engine.Math.toRadians(view.heading || 0), pitch: engine.Math.toRadians(-35), roll: 0 } }); }
     async function openRealspace() {
@@ -329,17 +357,21 @@
         viewer.terrainProvider = new engine.EllipsoidTerrainProvider();
         state.terrainProvider = null;
         state.terrainEnabled = false;
-        if (state.config?.terrain_url) {
-            try {
-                state.terrainProvider = await createTerrainProvider(engine);
-                if (state.terrainProvider) {
-                    viewer.terrainProvider = state.terrainProvider;
-                    state.terrainEnabled = true;
-                }
-            } catch (error) {
-                state.terrainProvider = null;
-                toast(`SCT 地形提供器加载失败：${error.message}`);
+
+        // 尝试加载地形（优先SCT，降级到Cesium World Terrain）
+        try {
+            state.terrainProvider = await createTerrainProvider(engine);
+            if (state.terrainProvider) {
+                viewer.terrainProvider = state.terrainProvider;
+                state.terrainEnabled = true;
+                console.log('[3D] 地形加载成功');
+            } else {
+                console.log('[3D] 无可用地形，使用平面模式');
             }
+        } catch (error) {
+            console.error('[3D] 地形加载异常:', error);
+            state.terrainProvider = null;
+            // 保持平面地球，不阻塞场景加载
         }
         if (typeof viewer.scene.open === "function" && state.config?.scene_url) { try { await viewer.scene.open(state.config.scene_url); state.realspaceOpened = true; $("engine-status").textContent = "SuperMap Realspace"; $("map-subtitle").textContent = "真实 iServer SCT 场景已打开"; } catch (error) { state.realspaceOpened = false; showEngineFallback(`Realspace 打开失败：${error.message}`); toast(`Realspace 打开失败，保留场景信息：${error.message}`); } }
         else { state.realspaceOpened = false; $("engine-status").textContent = "Cesium 兼容模式"; $("map-subtitle").textContent = "已读取 iServer 场景配置，等待 SuperMap3D 运行库"; }
