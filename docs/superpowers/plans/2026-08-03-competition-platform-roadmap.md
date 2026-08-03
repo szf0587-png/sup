@@ -153,18 +153,20 @@ GET    /api/projects/{project_id}/iserver-assets/{asset_id}/metadata
 DELETE /api/projects/{project_id}/iserver-assets/{asset_id}
 ```
 
-- [ ] Add `project_id`, lifecycle status, publication timestamps, and last error fields to `IServerService`; migrate existing SQLite databases idempotently with `scripts/migrate_v42.py`.
-- [ ] Implement `IServerAssetService` so every query filters by both `project_id` and `current_user.id` before contacting iServer.
-- [ ] Generate server-side resource names as `u_<user-id-prefix>_p_<project-id-prefix>_<sanitized-name>` and reject collisions.
-- [ ] Implement import, publish, unpublish, preview, metadata, and soft-delete endpoints; never return iServer administrator credentials.
-- [ ] Build `data-center.html` with project selector, data-source tree, asset table, metadata drawer, map preview, upload/import dialog, publication status, and recoverable error states.
-- [ ] Reuse the current dataset upload and metadata APIs instead of duplicating local-file persistence.
-- [ ] Add tests proving user A cannot list, preview, publish, or delete user B assets even when IDs are guessed.
-- [ ] Add tests for iServer offline, duplicate names, unsupported formats, invalid CRS, failed publication, and successful retry.
-- [ ] Run `python -m pytest tests/test_iserver_assets.py -q`; expected result: all authorization and lifecycle tests pass.
-- [ ] Commit with `feat: add project-scoped iServer data center`.
+- [x] Add `project_id`, lifecycle status, publication timestamps, and last error fields to `IServerService`; migrate existing SQLite databases idempotently with `scripts/migrate_v42.py`.
+- [x] Implement `IServerAssetService` so every query filters by both `project_id` and `current_user.id` before contacting iServer.
+- [x] Generate server-side resource names as `u_<user-id-prefix>_p_<project-id-prefix>_<sanitized-name>` and reject collisions.
+- [x] Implement import, publish, unpublish, preview, metadata, and soft-delete endpoints; never return iServer administrator credentials.
+- [x] Build `data-center.html` with project selector, data-source tree, asset table, metadata drawer, map preview, upload/import dialog, publication status, and recoverable error states.
+- [x] Reuse the current dataset upload and metadata APIs instead of duplicating local-file persistence.
+- [x] Add tests proving user A cannot list, preview, publish, or delete user B assets even when IDs are guessed.
+- [x] Add tests for iServer offline, duplicate names, unsupported formats, invalid CRS, failed publication, and successful retry.
+- [x] Run `python -m pytest tests/test_iserver_assets.py -q`; expected result: all authorization and lifecycle tests pass.
+- [x] Commit with `feat: add project-scoped iServer data center`.
 
 **Gate M3:** Two test users see disjoint project resources and can independently import, preview, publish, unpublish, and delete their own assets.
+
+> 2026-08-04: implementation, unit/contract tests and task-level code review are complete. The gate remains pending a real iServer 2026 smoke test with two users; no online verification is claimed without that service.
 
 ---
 
@@ -310,4 +312,3 @@ POST   /api/ai/conversations/{conversation_id}/messages
 | AI 对话与 BYOK | M5 | Encrypted-key and tenant-isolation tests |
 | 核心决策结果真实 | M4 | Frozen-case checksums and zero simulated scored paths |
 | 比赛材料可提交 | M6 | Clean-machine cold-start and package validator PASS |
-
