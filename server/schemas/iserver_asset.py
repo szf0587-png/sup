@@ -7,12 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class AssetImportRequest(BaseModel):
-    service_name: str = Field(..., min_length=1, max_length=160)
-    service_type: str = Field("data", pattern="^(data|map|feature|3d)$")
-    datasource_name: str = Field(..., min_length=1, max_length=160)
-    dataset_name: str = Field(..., min_length=1, max_length=160)
-    service_url: Optional[str] = None
-    service_config: Optional[dict[str, Any]] = None
+    dataset_id: str = Field(..., min_length=1, max_length=160)
 
 
 class AssetItem(BaseModel):
@@ -24,6 +19,10 @@ class AssetItem(BaseModel):
     dataset_name: str
     service_url: Optional[str]
     is_active: bool
+    lifecycle_status: str
+    published_at: Optional[datetime]
+    unpublished_at: Optional[datetime]
+    last_error: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -32,4 +31,3 @@ class AssetListResponse(BaseModel):
     project_id: str
     total: int
     assets: list[AssetItem]
-

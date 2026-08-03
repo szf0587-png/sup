@@ -6,7 +6,7 @@ from sqlalchemy import Engine, inspect, text
 
 
 def migrate_v42(engine: Engine) -> None:
-    """Add project ownership to existing iServer service rows without data loss."""
+    """Add project-scoped iServer lifecycle fields without data loss."""
     inspector = inspect(engine)
     if "iserver_services" not in inspector.get_table_names():
         return
@@ -16,6 +16,16 @@ def migrate_v42(engine: Engine) -> None:
     with engine.begin() as connection:
         if "project_id" not in columns:
             connection.execute(text("ALTER TABLE iserver_services ADD COLUMN project_id VARCHAR"))
+        additions = {
+            "dataset_id": "VARCHAR",
+            "lifecycle_status": "VARCHAR NOT NULL DEFAULT 'imported'",
+            "published_at": "DATETIME",
+            "unpublished_at": "DATETIME",
+            "last_error": "VARCHAR",
+        }
+        for name, definition in additions.items():
+            if name not in columns:
+                connection.execute(text(f"ALTER TABLE iserver_services ADD COLUMN {name} {definition}"))
 
         index_names = {index["name"] for index in inspect(connection).get_indexes("iserver_services")}
         if "ix_iserver_services_project_id" not in index_names:
@@ -29,6 +39,16 @@ def migrate_v42(engine: Engine) -> None:
                     "CREATE INDEX ix_iserver_services_project_id "
                     "ON iserver_services (project_id)"
                 ))
+        if "ix_iserver_services_dataset_id" not in index_names:
+            connection.execute(text(
+                "CREATE INDEX " + ("IF NOT EXISTS " if dialect == "postgresql" else "")
+                + "ix_iserver_services_dataset_id ON iserver_services (dataset_id)"
+            ))
+        if "ix_iserver_services_lifecycle_status" not in index_names:
+            connection.execute(text(
+                "CREATE INDEX " + ("IF NOT EXISTS " if dialect == "postgresql" else "")
+                + "ix_iserver_services_lifecycle_status ON iserver_services (lifecycle_status)"
+            ))
 
 
 if __name__ == "__main__":

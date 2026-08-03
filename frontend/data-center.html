@@ -86,6 +86,7 @@
                     <dl class="detail-kv"><div><dt>数据源</dt><dd id="detail-datasource">--</dd></div><div><dt>数据集</dt><dd id="detail-dataset">--</dd></div><div><dt>登记时间</dt><dd id="detail-created">--</dd></div></dl>
                     <section class="detail-section"><header><h3>iServer 元数据</h3><span id="metadata-state">读取中</span></header><pre id="metadata-output">--</pre></section>
                     <section class="detail-section"><header><h3>要素预览</h3><span id="preview-state">读取中</span></header><pre id="preview-output">--</pre></section>
+                    <button class="primary-action" id="toggle-publish-asset" type="button">发布到 iServer</button>
                     <button class="danger-action" id="delete-asset-button" type="button"><i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>删除服务并移出项目</span></button>
                 </div>
             </aside>
@@ -98,17 +99,11 @@
     <form id="asset-form" method="dialog">
         <header class="dialog-header"><div><p class="eyebrow">Register Service</p><h2 id="asset-dialog-title">登记 iServer 服务</h2></div><button class="icon-action compact" type="button" data-close-dialog title="关闭"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header>
         <div class="dialog-body">
-            <p class="dialog-help">登记不会上传数据，只保存当前项目使用的 iServer 服务定位信息。</p>
-            <div class="field-grid">
-                <label class="field"><span>服务名称</span><input name="service_name" required maxlength="160" placeholder="例如 luonan-data"></label>
-                <label class="field"><span>服务类型</span><select name="service_type"><option value="data">数据服务</option><option value="map">地图服务</option><option value="feature">要素服务</option><option value="3d">三维服务</option></select></label>
-                <label class="field"><span>数据源名称</span><input name="datasource_name" required maxlength="160" placeholder="例如 luonan"></label>
-                <label class="field"><span>数据集名称</span><input name="dataset_name" required maxlength="160" placeholder="例如 towns"></label>
-            </div>
-            <label class="field"><span>服务 URL（可选）</span><input name="service_url" type="url" placeholder="http://127.0.0.1:8090/iserver/services/…"></label>
-            <label class="field"><span>配置 JSON（可选）</span><textarea name="service_config" rows="4" placeholder='{"crs":"EPSG:4326"}'></textarea></label>
+            <p class="dialog-help">上传的数据会先进入当前用户的数据集库，再关联到此项目。支持 EPSG:4326 或 EPSG:3857 的 GeoJSON。</p>
+            <label class="field"><span>数据文件</span><input name="asset_file" type="file" accept=".geojson,.json" required></label>
+            <label class="field"><span>显示名称（可选）</span><input name="dataset_name" maxlength="160" placeholder="例如 luonan-boundary"></label>
         </div>
-        <footer class="dialog-footer"><button class="secondary-action" type="button" data-close-dialog>取消</button><button class="primary-action" id="submit-asset" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i><span>保存登记</span></button></footer>
+        <footer class="dialog-footer"><button class="secondary-action" type="button" data-close-dialog>取消</button><button class="primary-action" id="submit-asset" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i><span>上传并导入</span></button></footer>
     </form>
 </dialog>
 

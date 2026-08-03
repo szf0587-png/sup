@@ -1157,3 +1157,39 @@ def delete_service(service_name: str) -> bool:
         return r.status_code in (200, 204)
     except Exception:
         return False
+
+
+def publish_dataset_file(dataset_path: str, service_name: str, datasource_alias: str) -> dict:
+    """Publish a supported local dataset through the Manager API boundary.
+
+    Credentials remain inside this module; callers only receive lifecycle-safe
+    status, URL, and diagnostic information.
+    """
+    from pathlib import Path
+
+    source = Path(dataset_path)
+    suffix = source.suffix.lower()
+    if not source.is_file():
+        return {"status": "source_missing", "detail": "Uploaded dataset file is missing", "service_url": None}
+    if suffix == ".udbx":
+        publish_path = source
+    elif suffix in {".geojson", ".json"}:
+        try:
+            from server.integrations.udbx_publisher import geojson_to_udbx
+
+            publish_path = source.with_name(f"{service_name}.udbx")
+            if not geojson_to_udbx(source, publish_path, service_name):
+                return {"status": "source_prepare_failed", "detail": "Could not prepare uploaded GeoJSON for iServer", "service_url": None}
+        except Exception as exc:
+            return {"status": "source_prepare_failed", "detail": str(exc), "service_url": None}
+    else:
+        return {"status": "unsupported_format", "detail": "Only GeoJSON and UDBX datasets can be published", "service_url": None}
+
+    return publish_udbx_as_data_service(str(publish_path), service_name, datasource_alias)
+
+
+def unpublish_service(service_name: str) -> dict:
+    """Remove a service without exposing Manager API credentials to callers."""
+    if delete_service(service_name):
+        return {"status": "unpublished"}
+    return {"status": "unpublish_failed", "detail": "iServer did not confirm service removal"}

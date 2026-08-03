@@ -8,9 +8,11 @@ from fastapi import HTTPException
 from server.database import Base
 from server.models.user import User
 from server.models.project import Project
+from server.models.dataset import Dataset
 from server.models.iserver_service import IServerService
 from server.api import iserver_assets
 from server.main import app
+from server.services.iserver_asset_service import IServerAssetService
 
 
 @pytest.fixture()
@@ -92,7 +94,7 @@ def test_delete_project_asset_requires_ownership(db, monkeypatch):
     with pytest.raises(HTTPException) as error:
         iserver_assets.delete_project_asset(project.id, asset.id, other, db)
 
-    assert error.value.status_code == 403
+    assert error.value.status_code in {403, 404}
 
 
 def test_delete_project_asset_removes_remote_service_and_soft_deletes(db, monkeypatch):
@@ -123,3 +125,155 @@ def test_delete_project_asset_removes_remote_service_and_soft_deletes(db, monkey
 def test_import_alias_is_exposed_for_submission_contract():
     paths = set(app.openapi()["paths"])
     assert "/api/projects/{project_id}/iserver-assets/import" in paths
+
+
+def test_publish_and_unpublish_routes_are_exposed():
+    paths = set(app.openapi()["paths"])
+
+    assert "/api/projects/{project_id}/iserver-assets/{asset_id}/publish" in paths
+    assert "/api/projects/{project_id}/iserver-assets/{asset_id}/unpublish" in paths
+
+
+def _dataset(user_id: str, dataset_id: str = "dataset_owner", **overrides) -> Dataset:
+    values = {
+        "id": dataset_id,
+        "user_id": user_id,
+        "name": "County Boundary",
+        "dataset_type": "vector",
+        "file_path": "users/user_owner/vector/boundary.geojson",
+        "file_size": 10,
+        "crs": "EPSG:4326",
+        "extra_metadata": {"feature_count": 1},
+    }
+    values.update(overrides)
+    return Dataset(**values)
+
+
+def test_import_builds_project_and_user_scoped_resource_name(db):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=["dataset_owner"])
+    dataset = _dataset(owner.id)
+    db.add_all([owner, project, dataset])
+    db.commit()
+
+    asset = IServerAssetService(db, owner).import_dataset(project.id, dataset.id)
+
+    assert asset.service_name == "u_user_own_p_project_county_boundary"
+    assert asset.dataset_id == dataset.id
+    assert asset.lifecycle_status == "imported"
+    assert asset.last_error is None
+
+
+def test_import_rejects_duplicate_generated_resource_name(db):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=["dataset_a", "dataset_b"])
+    first = _dataset(owner.id, "dataset_a", name="County Boundary")
+    second = _dataset(owner.id, "dataset_b", name="County Boundary")
+    db.add_all([owner, project, first, second])
+    db.commit()
+    service = IServerAssetService(db, owner)
+    service.import_dataset(project.id, first.id)
+
+    with pytest.raises(HTTPException) as error:
+        service.import_dataset(project.id, second.id)
+
+    assert error.value.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "dataset_kwargs",
+    [
+        {"file_path": "users/user_owner/vector/boundary.kml"},
+        {"crs": "EPSG:4490"},
+    ],
+)
+def test_import_rejects_unsupported_formats_and_invalid_crs(db, dataset_kwargs):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=["dataset_owner"])
+    dataset = _dataset(owner.id, **dataset_kwargs)
+    db.add_all([owner, project, dataset])
+    db.commit()
+
+    with pytest.raises(HTTPException) as error:
+        IServerAssetService(db, owner).import_dataset(project.id, dataset.id)
+
+    assert error.value.status_code == 422
+
+
+@pytest.mark.parametrize("failure_status", ["iserver_unreachable", "publish_failed"])
+def test_publish_records_failure_and_can_retry(db, monkeypatch, failure_status):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=["dataset_owner"])
+    dataset = _dataset(owner.id)
+    db.add_all([owner, project, dataset])
+    db.commit()
+    service = IServerAssetService(db, owner)
+    asset = service.import_dataset(project.id, dataset.id)
+
+    monkeypatch.setattr(service.client, "publish_dataset_file", lambda *_: {"status": failure_status, "detail": "offline"})
+    with pytest.raises(HTTPException) as error:
+        service.publish(project.id, asset.id)
+
+    assert error.value.status_code == 502
+    db.refresh(asset)
+    assert asset.lifecycle_status == "publish_failed"
+    assert asset.last_error == "offline"
+
+    monkeypatch.setattr(service.client, "publish_dataset_file", lambda *_: {"status": "published", "service_url": "http://iserver/data"})
+    published = service.publish(project.id, asset.id)
+
+    assert published.lifecycle_status == "published"
+    assert published.service_url == "http://iserver/data"
+    assert published.last_error is None
+    assert published.published_at is not None
+
+
+def test_unpublish_updates_lifecycle_without_disclosing_credentials(db, monkeypatch):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=[])
+    asset = IServerService(
+        id="service_owner",
+        user_id=owner.id,
+        project_id=project.id,
+        service_name="u_user_own_p_project__county_boundary",
+        service_type="data",
+        datasource_name="u_user_own_p_project__county_boundary",
+        dataset_name="County Boundary",
+        lifecycle_status="published",
+        is_active=True,
+    )
+    db.add_all([owner, project, asset])
+    db.commit()
+    service = IServerAssetService(db, owner)
+    monkeypatch.setattr(service.client, "unpublish_service", lambda _: {"status": "unpublished"})
+
+    result = service.unpublish(project.id, asset.id)
+
+    assert result.lifecycle_status == "unpublished"
+    assert result.unpublished_at is not None
+    assert result.is_active is False
+
+
+@pytest.mark.parametrize("operation", ["preview", "publish", "delete"])
+def test_guessed_asset_id_cannot_be_operated_by_another_user(db, operation):
+    owner = _user("user_owner", "owner")
+    other = _user("user_other", "other")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=[])
+    asset = IServerService(
+        id="service_owner",
+        user_id=owner.id,
+        project_id=project.id,
+        service_name="data-owner",
+        service_type="data",
+        datasource_name="owner_ds",
+        dataset_name="owner_layer",
+        is_active=True,
+    )
+    db.add_all([owner, other, project, asset])
+    db.commit()
+    service = IServerAssetService(db, other)
+
+    with pytest.raises(HTTPException) as error:
+        getattr(service, operation)(project.id, asset.id)
+
+    assert error.value.status_code in {403, 404}

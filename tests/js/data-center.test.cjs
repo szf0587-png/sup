@@ -16,6 +16,9 @@ test('data center page exposes project-scoped asset workflow', () => {
   assert.match(js, /metadata/);
   assert.match(js, /preview/);
   assert.match(js, /DELETE/);
+  assert.match(js, /\/publish/);
+  assert.match(js, /\/unpublish/);
+  assert.match(js, /\/api\/datasets\/upload/);
 });
 
 test('data center page keeps service registration and offline state visible', () => {

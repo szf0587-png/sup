@@ -13,6 +13,7 @@ class IServerService(Base):
     id = Column(String, primary_key=True)  # UUID: service_xxx
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
+    dataset_id = Column(String, ForeignKey("datasets.id"), nullable=True, index=True)
 
     # 服务命名：{user_prefix}_{dataset_name}，实现命名空间隔离
     service_name = Column(String, unique=True, nullable=False, index=True, comment="iServer服务名称")
@@ -35,6 +36,10 @@ class IServerService(Base):
     # 状态
     is_active = Column(Boolean, default=True, nullable=False, comment="服务是否在线")
     is_deleted = Column(Boolean, default=False, nullable=False)
+    lifecycle_status = Column(String, default="imported", nullable=False, index=True)
+    published_at = Column(DateTime, nullable=True)
+    unpublished_at = Column(DateTime, nullable=True)
+    last_error = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

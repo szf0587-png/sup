@@ -88,16 +88,19 @@
                 <td><span class="type-badge"></span></td>
                 <td><span class="asset-sub asset-datasource"></span><span class="asset-sub asset-dataset"></span></td>
                 <td><span class="status-badge"></span></td>
-                <td><div class="row-actions"><button class="row-action inspect-action" type="button" title="查看详情" aria-label="查看详情"><i class="fa-solid fa-eye"></i></button><button class="row-action is-danger delete-action" type="button" title="删除服务" aria-label="删除服务"><i class="fa-solid fa-trash-can"></i></button></div></td>`;
+                <td><div class="row-actions"><button class="row-action inspect-action" type="button" title="查看详情" aria-label="查看详情"><i class="fa-solid fa-eye"></i></button><button class="row-action publish-action" type="button" title="发布或取消发布" aria-label="发布或取消发布"><i class="fa-solid fa-cloud-arrow-up"></i></button><button class="row-action is-danger delete-action" type="button" title="删除服务" aria-label="删除服务"><i class="fa-solid fa-trash-can"></i></button></div></td>`;
             row.querySelector(".asset-name").textContent = asset.service_name;
             row.querySelector(".asset-sub").textContent = asset.service_url || "iServer 服务";
             row.querySelector(".type-badge").textContent = asset.service_type;
             row.querySelector(".asset-datasource").textContent = asset.datasource_name;
             row.querySelector(".asset-dataset").textContent = asset.dataset_name;
             const status = row.querySelector(".status-badge");
-            status.textContent = asset.is_active ? "已登记" : "已停用";
-            status.classList.toggle("is-offline", !asset.is_active);
+            status.textContent = asset.lifecycle_status || (asset.is_active ? "published" : "imported");
+            status.classList.toggle("is-offline", asset.lifecycle_status === "publish_failed" || asset.lifecycle_status === "unpublish_failed");
             row.querySelector(".inspect-action").addEventListener("click", () => selectAsset(asset.id));
+            row.querySelector(".publish-action").addEventListener("click", async () => {
+                try { await togglePublication(asset); } catch (error) { showToast(error.message, "error"); }
+            });
             row.querySelector(".delete-action").addEventListener("click", () => openDeleteDialog(asset));
             row.addEventListener("dblclick", () => selectAsset(asset.id));
             body.appendChild(row);
@@ -160,6 +163,8 @@
         byId("detail-datasource").textContent = asset.datasource_name;
         byId("detail-dataset").textContent = asset.dataset_name;
         byId("detail-created").textContent = formatDate(asset.created_at);
+        const publishButton = byId("toggle-publish-asset");
+        publishButton.textContent = asset.lifecycle_status === "published" ? "取消发布" : "发布到 iServer";
         byId("metadata-output").textContent = loadRemote ? "正在读取…" : "保留上次读取结果";
         byId("preview-output").textContent = loadRemote ? "正在读取…" : "保留上次读取结果";
         if (!loadRemote) return;
@@ -186,6 +191,17 @@
             byId("preview-output").textContent = error.message;
             byId("preview-state").textContent = "不可用";
         }
+    }
+
+    async function togglePublication(asset) {
+        const isPublished = asset.lifecycle_status === "published";
+        const lifecyclePath = isPublished ? "/unpublish" : "/publish";
+        const response = await Auth.fetch(`${assetEndpoint(asset.id)}${lifecyclePath}`, { method: "POST" });
+        const data = await readJson(response);
+        if (!response.ok) throw new Error(getDetail(data, isPublished ? "取消发布失败" : "发布失败，可稍后重试"));
+        showToast(isPublished ? "服务已取消发布" : "服务已发布到 iServer");
+        await loadAssets();
+        if (state.selectedAsset?.id === asset.id) await selectAsset(asset.id);
     }
 
     function openDeleteDialog(asset) {
@@ -228,25 +244,26 @@
         event.preventDefault();
         if (!state.projectId) return;
         const form = new FormData(event.currentTarget);
-        const payload = {
-            service_name: String(form.get("service_name") || "").trim(),
-            service_type: form.get("service_type"),
-            datasource_name: String(form.get("datasource_name") || "").trim(),
-            dataset_name: String(form.get("dataset_name") || "").trim(),
-            service_url: String(form.get("service_url") || "").trim() || null,
-        };
-        const config = String(form.get("service_config") || "").trim();
-        if (config) {
-            try { payload.service_config = JSON.parse(config); } catch { showToast("配置 JSON 格式错误", "error"); return; }
-        }
+        const file = form.get("asset_file");
+        if (!(file instanceof File) || !file.name) { showToast("请选择 GeoJSON 数据文件", "warning"); return; }
         const button = byId("submit-asset");
         button.disabled = true;
         try {
-            const response = await Auth.fetch(assetEndpoint(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            const upload = new FormData();
+            upload.append("file", file);
+            const name = String(form.get("dataset_name") || "").trim();
+            if (name) upload.append("name", name);
+            const uploadResponse = await Auth.fetch("/api/datasets/upload", { method: "POST", body: upload });
+            const uploaded = await readJson(uploadResponse);
+            if (!uploadResponse.ok) throw new Error(getDetail(uploaded, "数据上传失败"));
+            const projectResponse = await Auth.fetch(`/api/projects/${state.projectId}/datasets`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataset_id: uploaded.id }) });
+            const projectData = await readJson(projectResponse);
+            if (!projectResponse.ok) throw new Error(getDetail(projectData, "数据集未加入项目"));
+            const response = await Auth.fetch(`${assetEndpoint()}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataset_id: uploaded.id }) });
             const data = await readJson(response);
-            if (!response.ok) throw new Error(getDetail(data, "服务登记失败"));
+            if (!response.ok) throw new Error(getDetail(data, "数据导入失败"));
             byId("asset-dialog").close();
-            showToast("iServer 服务已登记到当前项目");
+            showToast("数据已导入当前项目，可发布到 iServer");
             await loadAssets();
         } catch (error) { showToast(error.message, "error"); }
         finally { button.disabled = false; }
@@ -267,6 +284,10 @@
     byId("refresh-button").addEventListener("click", async () => { try { await loadProjects(); await loadAssets(); showToast("项目数据已刷新"); } catch (error) { showToast(error.message, "error"); } });
     byId("register-button").addEventListener("click", openAssetDialog);
     byId("asset-form").addEventListener("submit", registerAsset);
+    byId("toggle-publish-asset").addEventListener("click", async () => {
+        if (!state.selectedAsset) return;
+        try { await togglePublication(state.selectedAsset); } catch (error) { showToast(error.message, "error"); }
+    });
     byId("delete-asset-button").addEventListener("click", () => state.selectedAsset && openDeleteDialog(state.selectedAsset));
     byId("confirm-form").addEventListener("submit", (event) => { event.preventDefault(); deleteAsset(); });
     byId("close-detail").addEventListener("click", resetDetails);
