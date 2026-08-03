@@ -1,5 +1,6 @@
 import asyncio
 
+import pytest
 import requests
 
 from server.api import scene_3d
@@ -45,19 +46,21 @@ def test_unpublish_treats_missing_remote_service_as_idempotent_success(monkeypat
     assert iserver_client.unpublish_service("missing-service") == {"status": "unpublished"}
 
 
-def test_data_preview_converts_feature_resource_to_geojson_feature_collection(monkeypatch):
+@pytest.mark.parametrize("status_code", [200, 201])
+def test_data_preview_converts_feature_resource_to_geojson_feature_collection(monkeypatch, status_code):
     class Response:
-        status_code = 200
         text = ""
 
-        def __init__(self, payload):
+        def __init__(self, payload, response_status=status_code):
             self._payload = payload
+            self.status_code = response_status
 
         def json(self):
             return self._payload
 
     class Session:
-        def post(self, *args, **kwargs):
+        def post(self, url, **kwargs):
+            calls.append((url, kwargs["json"]))
             return Response({"featureUriList": ["http://iserver/features/1"], "totalCount": 1})
 
         def get(self, url, **kwargs):
@@ -70,8 +73,9 @@ def test_data_preview_converts_feature_resource_to_geojson_feature_collection(mo
                     "type": "REGION", "parts": [5],
                     "points": [{"x": 100, "y": 20}, {"x": 101, "y": 20}, {"x": 101, "y": 21}, {"x": 100, "y": 20}, {"x": 100, "y": 20}],
                 },
-            })
+            }, 200)
 
+    calls = []
     monkeypatch.setattr(iserver_client, "_get_session", lambda: Session())
 
     preview = iserver_client.get_data_service("owner_ds", "boundary_R", max_features=10)
@@ -81,3 +85,4 @@ def test_data_preview_converts_feature_resource_to_geojson_feature_collection(mo
         "type": "Feature", "id": 7, "properties": {"name": "Boundary"},
         "geometry": {"type": "Polygon", "coordinates": [[[100, 20], [101, 20], [101, 21], [100, 20], [100, 20]]]},
     }]
+    assert calls[0][1]["datasetNames"] == ["owner_ds:boundary_R"]

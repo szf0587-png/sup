@@ -394,17 +394,18 @@ def get_map_tile_url(service_name: str, map_name: str, layer_idx: int = 0) -> st
 def get_data_service(datasource_name: str, dataset_name: str, max_features: int = 100) -> dict | None:
     """查询数据服务中的要素（GET 全量，POST 带条件）"""
     try:
+        qualified_name = dataset_name if ":" in dataset_name else f"{datasource_name}:{dataset_name}"
         r = _get_session().post(
             f"{ISERVER_BASE}/iserver/services/data-{datasource_name}/rest/data/featureResults.json",
             json={
-                "datasetNames": [dataset_name],
+                "datasetNames": [qualified_name],
                 "maxFeatures": max_features,
                 "returnFeatureWithFieldCaption": True,
                 "getFeatureMode": "GET_BY_BOUNDS",
             },
             timeout=15,
         )
-        if r.status_code == 200:
+        if r.status_code in (200, 201):
             return _feature_result_to_geojson(r.json(), max_features)
     except Exception:
         pass
