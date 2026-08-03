@@ -2,7 +2,7 @@
 
 基于 SuperMap iServer 的土地资源分析与可视化工作台。系统围绕评估边界开展逐步空间分析，支持将每一步的文字结果和地图要素返回到同一工作区。
 
-**当前版本**: v4.1（多用户 SaaS + iServer 深度集成 + 3D Realspace 工作台）
+**当前版本**: v4.2（多用户 SaaS + iServer 深度集成 + 3D Realspace 工作台）
 
 ---
 

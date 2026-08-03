@@ -1,4 +1,4 @@
-"""天眼寻珍·苍穹 — FastAPI 主入口（v2.0）
+"""天眼寻珍·苍穹 — FastAPI 主入口（v4.2）
 
 渐进适配策略:
 - Phase 0: 独立可启动，挂载系统状态 + iServer 检查
@@ -25,7 +25,7 @@ from server.config import (
     FRONTEND_DIR, FASTAPI_HOST, FASTAPI_PORT,
     CASE_STUDY, IMAGE_SERVICE_ENABLED, THREE_D_ENABLED,
     AI_REALTIME_ENABLED, AI_PRECOMPUTED_AVAILABLE,
-    GEE_PROJECT_ID,
+    GEE_PROJECT_ID, APP_VERSION,
 )
 
 # ---------------------------------------------------------------------------
@@ -70,6 +70,10 @@ app.include_router(datasets_router)
 from server.api.projects import router as projects_router
 app.include_router(projects_router)
 
+# Phase 4 - 项目级 iServer 数据资产管理
+from server.api.iserver_assets import router as iserver_assets_router
+app.include_router(iserver_assets_router)
+
 # ================================
 # Phase 1 — 金标准 CRUD（已迁移）
 # ================================
@@ -103,7 +107,7 @@ def system_status():
     from server.integrations.iserver_client import check_iserver
     iserver_ok = check_iserver()
     return {
-        "status": "ok", "version": "2.0.0",
+        "status": "ok", "version": APP_VERSION,
         "case_study": CASE_STUDY,
         "services": {
             "iserver": "online" if iserver_ok else "offline",

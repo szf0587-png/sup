@@ -3,7 +3,7 @@
  * 用于处理用户登录、token 管理、用户信息获取等
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = window.location.origin;
 
 const Auth = {
     /**
@@ -97,7 +97,8 @@ const Auth = {
             await this.getCurrentUser();
         } catch (error) {
             console.error('认证检查失败:', error);
-            window.location.href = 'login.html';
+            const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+            window.location.href = `login.html?next=${encodeURIComponent(next)}`;
         }
     },
 

@@ -99,7 +99,7 @@ th {{ background: #2c7a4b; color: white; }}
 
     html += f"""
 <div class="footer">
-<p>天眼寻珍·苍穹 v2.0 | SuperMap AI GIS 农业遥感智能监测与决策平台</p>
+<p>天眼寻珍·苍穹 v4.2 | SuperMap AI GIS 农业遥感智能监测与决策平台</p>
 <p>数据来源: GEE MODIS/006, SRTM GL1, 金标准库 | 本报告基于固定案例生成，仅供决策参考</p>
 </div>
 </body>

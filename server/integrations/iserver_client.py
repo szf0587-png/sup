@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+import os
 from math import cos, radians
 from typing import Any
 import requests
@@ -55,6 +56,11 @@ def _get_session() -> requests.Session:
     with _lock:
         if _session is None:
             _session = requests.Session()
+            # Local iServer deployments must not inherit a malformed Windows
+            # NETRC/proxy configuration from the user's shell environment.
+            # Opt in explicitly when a remote deployment needs environment
+            # proxy settings.
+            _session.trust_env = os.getenv("ISERVER_TRUST_ENV", "0").lower() in {"1", "true", "yes"}
             _session.headers.update({
                 "Accept": "application/json",
                 "Content-Type": "application/json",

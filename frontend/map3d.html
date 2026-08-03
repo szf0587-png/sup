@@ -144,6 +144,7 @@
                 <button class="tool-button" id="open-rest" type="button"><i class="fa-solid fa-arrow-up-right-from-square"></i>REST</button>
                 <button class="tool-button" id="back-2d" type="button"><i class="fa-solid fa-map"></i>返回二维</button>
                 <button class="tool-button" id="toggle-inspector" type="button"><i class="fa-solid fa-list"></i>检查器</button>
+                <a class="tool-button" href="data-center.html" style="text-decoration:none"><i class="fa-solid fa-database"></i>项目数据</a>
             </div>
             <div class="service-summary">
                 <div class="status-line"><span class="status-dot" id="service-dot"></span><span id="service-status">正在检查 iServer</span></div>
@@ -210,10 +211,11 @@
 </dialog>
 <div id="toast" class="toast" hidden></div>
 <script src="auth.js"></script>
+<script src="js/3d/terrain-controller.js"></script>
 <script>
 (function () {
     "use strict";
-    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 1, nativeCatalog: null, activeOperation: null, toastTimer: null };
+    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainController: null, terrainDiagnostics: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 1, nativeCatalog: null, activeOperation: null, toastTimer: null };
     const SAFE_CAMERA_HEIGHT = 7200;
     const $ = (id) => document.getElementById(id);
     const knownOperationHints = { geometryBuffer3D: "三维缓冲区", geometry3DMinDistance: "三维最短距离", geometryViewShedBody: "三维可视域", geometrySkylineSectorBody: "天际线扇区", geometryDrone3DGridPathPlanning: "无人机三维网格路径规划" };
@@ -252,13 +254,64 @@
         $("scene-list").innerHTML = state.scenes.length ? state.scenes.map((scene) => `<button class="native-tool" data-scene="${scene.scene_name}"><span class="tool-icon"><i class="fa-solid fa-cube"></i></span><span><strong>${scene.scene_name}</strong><small>${scene.service_name} · ${scene.terrain_available ? "含 SCT 地形" : "无 TerrainFileLayer"}</small></span><em>${scene.terrain_available ? "在线" : "检查"}</em></button>`).join("") : '<div class="empty">iServer 未发布三维服务</div>';
         $("scene-list").querySelectorAll("[data-scene]").forEach((button) => button.addEventListener("click", () => { $("scene-select").value = button.dataset.scene; loadSelectedScene(); }));
     }
-    function populateSceneSelect() { $("scene-select").innerHTML = state.scenes.length ? state.scenes.map((scene) => `<option value="${scene.scene_name}">${scene.scene_name}</option>`).join("") : '<option>没有可用场景</option>'; }
+    function populateSceneSelect() {
+        const select = $("scene-select");
+        select.innerHTML = state.scenes.length
+            ? state.scenes.map((scene) => `<option value="${scene.scene_name}">${scene.scene_name}</option>`).join("")
+            : '<option value="offline">iServer 离线预览</option>';
+        select.disabled = !state.scenes.length;
+    }
+    async function openOfflinePreview(reason) {
+        state.selected = {
+            scene_name: "洛南县离线预览",
+            service_name: "iServer offline",
+            terrain_available: false,
+            layers: [],
+            scenes: [],
+            datasets: [],
+        };
+        state.config = {
+            scene_name: state.selected.scene_name,
+            service_name: state.selected.service_name,
+            scene_url: null,
+            scene_resource_url: null,
+            terrain_url: null,
+            terrain_bounds: null,
+            layers: [],
+            initial_view: { longitude: 110.15, latitude: 34.09, height: 26000, heading: 0, pitch: -42 },
+        };
+        state.terrainDiagnostics = {
+            status: "degraded",
+            available: false,
+            provider_type: "ellipsoid",
+            reason: reason || "iServer 未连接",
+        };
+        $("scene-select").value = "offline";
+        $("service-name").textContent = "iServer offline";
+        $("scene-resource").textContent = "离线预览";
+        $("dataset-name").textContent = "--";
+        $("dataset-type").textContent = "ellipsoid";
+        $("map-title").textContent = "洛南县 · iServer 离线预览";
+        $("map-subtitle").textContent = "未加载真实 SCT 地形";
+        $("service-dot").className = "status-dot warn";
+        $("service-status").textContent = "iServer 离线，显示预览球体";
+        $("layer-list").innerHTML = '<div class="empty">iServer 恢复后可读取真实场景图层</div>';
+        try {
+            await openRealspace();
+            setStatus(`iServer 离线预览 · ${reason || "未连接服务"}`);
+        } catch (error) {
+            setStatus(`iServer 离线预览不可用 · ${error.message}`);
+        }
+    }
     async function loadScenes() {
         try {
             const payload = await api("/api/3d-services/scenes/list");
             state.scenes = payload.scenes || [];
             populateSceneSelect(); renderSceneList();
-            if (!state.scenes.length) { $("service-status").textContent = "iServer 未发布三维服务"; $("service-dot").className = "status-dot error"; setStatus("未发现 Realspace 服务"); return; }
+            if (!state.scenes.length) {
+                await openOfflinePreview(payload.reason || "iServer 未发布三维服务");
+                return;
+            }
             await loadSelectedScene();
         } catch (error) {
             const authRequired = error.status === 401;
@@ -266,12 +319,23 @@
             $("service-status").textContent = authRequired ? "请先登录后读取场景" : "iServer 连接失败";
             setStatus(authRequired ? "请先登录后读取 iServer 三维服务" : (error.message || "场景服务读取失败"));
             toast(authRequired ? "请先登录后读取 iServer 三维服务" : (error.message || "场景服务读取失败"));
+            if (!authRequired) await openOfflinePreview(error.message);
         }
     }
     async function loadSelectedScene() {
         const scene = selectedScene(); if (!scene) return;
         state.selected = scene; updateSceneSummary(scene); setStatus(`正在读取 ${scene.scene_name} 的 Realspace 配置`);
-        try { state.config = await api(`/api/3d-services/scenes/${encodeURIComponent(scene.scene_name)}/config`); updateSceneSummary({ ...scene, layers: state.config.layers || scene.layers }); applyCamera(); await openRealspace(); setStatus(`已连接 ${scene.service_name} · ${state.config.scene_resource || "默认场景"}`); }
+        try {
+            state.config = await api(`/api/3d-services/scenes/${encodeURIComponent(scene.scene_name)}/config`);
+            state.terrainDiagnostics = await api(`/api/3d-services/terrain/${encodeURIComponent(scene.scene_name)}/diagnostics`).catch(() => null);
+            updateSceneSummary({ ...scene, layers: state.config.layers || scene.layers });
+            applyCamera();
+            await openRealspace();
+            const terrainState = state.terrainDiagnostics;
+            setStatus(terrainState?.available
+                ? `已连接 ${scene.service_name} · SCT 地形就绪`
+                : `已连接 ${scene.service_name} · ${terrainState?.reason || "使用平面地形"}`);
+        }
         catch (error) { setStatus(error.message || "场景配置读取失败"); toast(error.message || "场景配置读取失败"); }
     }
     function getEngine() { return window.SuperMap3D || window.Cesium; }
@@ -312,6 +376,12 @@
         addReferenceImagery(state.viewer, engine);
         const cameraController = state.viewer.scene.screenSpaceCameraController;
         if (cameraController) { cameraController.enableRotate = true; cameraController.enableTilt = true; cameraController.enableZoom = true; cameraController.enableLook = true; }
+        state.terrainController = new window.TerrainController({
+            engine,
+            viewer: state.viewer,
+            state,
+            onStatus: setStatus,
+        });
         $("cesium-container").addEventListener("mousemove", (event) => { const rect = state.viewer.scene.canvas.getBoundingClientRect(); const cartesian = state.viewer.camera.pickEllipsoid(new state.engine.Cartesian2(event.clientX - rect.left, event.clientY - rect.top)); if (!cartesian) return; const cartographic = state.engine.Cartographic.fromCartesian(cartesian); $("coordinate-text").textContent = `${state.engine.Math.toDegrees(cartographic.longitude).toFixed(5)}, ${state.engine.Math.toDegrees(cartographic.latitude).toFixed(5)}`; });
         return state.viewer;
     }
@@ -322,7 +392,7 @@
                 const provider = new engine.SuperMapTerrainProvider({
                     url: state.config.terrain_url,
                     isSct: true,
-                    invisibility: true
+                    invisibility: false
                 });
                 if (provider.readyPromise) await provider.readyPromise;
                 console.log('[3D] 使用 iServer SCT 地形:', state.config.terrain_url);
@@ -354,16 +424,16 @@
         let engine;
         try { engine = await ensureEngine(); } catch (error) { state.realspaceOpened = false; showEngineFallback(`三维引擎资源不可用：${error.message}`); return; }
         hideEngineFallback(); const viewer = createViewer(engine); applyCamera();
-        viewer.terrainProvider = new engine.EllipsoidTerrainProvider();
-        state.terrainProvider = null;
-        state.terrainEnabled = false;
+        const terrain = state.terrainController;
+        terrain.setProvider(null);
+        terrain.setVisible(false);
 
         // 尝试加载地形（优先SCT，降级到Cesium World Terrain）
         try {
             state.terrainProvider = await createTerrainProvider(engine);
             if (state.terrainProvider) {
-                viewer.terrainProvider = state.terrainProvider;
-                state.terrainEnabled = true;
+                terrain.setProvider(state.terrainProvider);
+                terrain.setVisible(true);
                 console.log('[3D] 地形加载成功');
             } else {
                 console.log('[3D] 无可用地形，使用平面模式');
@@ -373,9 +443,23 @@
             state.terrainProvider = null;
             // 保持平面地球，不阻塞场景加载
         }
-        if (typeof viewer.scene.open === "function" && state.config?.scene_url) { try { await viewer.scene.open(state.config.scene_url); state.realspaceOpened = true; $("engine-status").textContent = "SuperMap Realspace"; $("map-subtitle").textContent = "真实 iServer SCT 场景已打开"; } catch (error) { state.realspaceOpened = false; showEngineFallback(`Realspace 打开失败：${error.message}`); toast(`Realspace 打开失败，保留场景信息：${error.message}`); } }
+        if (typeof viewer.scene.open === "function" && state.config?.scene_url) {
+            try {
+                await viewer.scene.open(state.config.scene_url);
+                state.realspaceOpened = true;
+                $("engine-status").textContent = "SuperMap Realspace";
+                const sctReady = Boolean(state.terrainDiagnostics?.available && state.terrainProvider);
+                $("map-subtitle").textContent = sctReady
+                    ? "真实 iServer Realspace + SCT 地形已打开"
+                    : "真实 iServer Realspace 已打开，当前无可用 SCT 地形";
+            } catch (error) {
+                state.realspaceOpened = false;
+                showEngineFallback(`Realspace 打开失败：${error.message}`);
+                toast(`Realspace 打开失败，保留场景信息：${error.message}`);
+            }
+        }
         else { state.realspaceOpened = false; $("engine-status").textContent = "Cesium 兼容模式"; $("map-subtitle").textContent = "已读取 iServer 场景配置，等待 SuperMap3D 运行库"; }
-        if (state.terrainProvider && viewer.terrainProvider !== state.terrainProvider) viewer.terrainProvider = state.terrainProvider;
+        if (state.terrainProvider && viewer.terrainProvider !== state.terrainProvider) terrain.setVisible(true);
         applyCamera();
     }
     function homeView() { if (!state.config?.initial_view || !state.viewer) return; applyCamera(); }
@@ -426,15 +510,10 @@
         });
     }
     function setTilt() { setTerrainPerspective(); }
-    function setExaggeration(value) { state.exaggeration = value; if (state.viewer?.scene) { state.viewer.scene.terrainExaggeration = value; state.viewer.scene.verticalExaggeration = value; } $("terrain-up").setAttribute("aria-pressed", String(value === 2)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
-    function toggleLayer(index, visible) { const layer = state.viewer?.scene?.layers?.get(index); if (layer) layer.visible = visible; const source = state.selected?.layers?.[index]; if (source) source.visible = visible; setStatus(`${source?.caption || source?.name || "图层"} ${visible ? "已显示" : "已隐藏"}`); }
+    function setExaggeration(value) { state.terrainController?.setExaggeration(value); $("terrain-up").setAttribute("aria-pressed", String(value === 2)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
     function toggleTerrain(visible, source) {
         if (!state.viewer || !state.engine) return;
-        if (state.terrainProvider) {
-            state.viewer.terrainProvider = visible ? state.terrainProvider : new state.engine.EllipsoidTerrainProvider();
-            state.terrainEnabled = visible;
-            if (state.viewer.scene.requestRender) state.viewer.scene.requestRender();
-        }
+        state.terrainController?.setVisible(visible);
         const collection = state.viewer.scene?.layers;
         const name = source?.name || source?.caption || source?.data_name || source?.dataName;
         let layer = collection?.find && name ? collection.find(name) : null;

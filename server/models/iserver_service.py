@@ -12,6 +12,7 @@ class IServerService(Base):
 
     id = Column(String, primary_key=True)  # UUID: service_xxx
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
 
     # 服务命名：{user_prefix}_{dataset_name}，实现命名空间隔离
     service_name = Column(String, unique=True, nullable=False, index=True, comment="iServer服务名称")

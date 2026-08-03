@@ -283,7 +283,12 @@ async def list_3d_scenes(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取三维场景列表失败: {str(e)}")
+        return {
+            "status": "degraded",
+            "count": 0,
+            "scenes": [],
+            "reason": f"iServer 不可用，暂时无法读取三维场景: {str(e)}",
+        }
 
 
 @router.get("/scenes/{scene_name}", summary="获取三维场景详情")
@@ -502,6 +507,89 @@ async def get_terrain_info(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取地形信息失败: {str(e)}")
+
+
+@router.get("/terrain/{scene_name}/diagnostics", summary="诊断三维地形渲染链路")
+async def get_terrain_diagnostics(
+    scene_name: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Return an explicit rendering contract for the frontend terrain controller.
+
+    The regular scene endpoint is intentionally permissive so the 3D page can
+    still open when iServer has no terrain. This endpoint keeps that fallback
+    visible by returning the selected provider and a human-readable reason.
+    """
+    try:
+        session = iserver_client._get_session()
+        service_name, clean_name = _resolve_service(session, scene_name)
+        scene_catalog = _scene_catalog(session, service_name)
+        scene_resource = _scene_resource_name(scene_catalog[0]) if scene_catalog else "默认场景"
+        scene_url = _scene_url(service_name, scene_resource)
+        scene_data = _json_get(session, scene_url, timeout=8) or {}
+        layers = scene_data.get("layers", []) if isinstance(scene_data, dict) else []
+        terrain_layers = [
+            layer for layer in layers
+            if isinstance(layer, dict)
+            and (layer.get("layer3DType") == "TerrainFileLayer" or layer.get("cacheType") == "TIN")
+        ]
+
+        if not terrain_layers:
+            return {
+                "status": "degraded",
+                "available": False,
+                "provider_type": "ellipsoid",
+                "scene_name": clean_name,
+                "service_name": service_name,
+                "scene_resource": scene_resource,
+                "terrain_url": None,
+                "layer_name": None,
+                "bounds": None,
+                "reason": "iServer 场景未返回 TerrainFileLayer/TIN 图层",
+            }
+
+        terrain_layer = terrain_layers[0]
+        terrain_url = _terrain_data_url(service_name, terrain_layers)
+        bounds = next((_sct_bounds(layer) for layer in terrain_layers if _sct_bounds(layer)), None)
+        if not terrain_url:
+            return {
+                "status": "degraded",
+                "available": False,
+                "provider_type": "ellipsoid",
+                "scene_name": clean_name,
+                "service_name": service_name,
+                "scene_resource": scene_resource,
+                "terrain_url": None,
+                "layer_name": terrain_layer.get("dataName") or terrain_layer.get("name"),
+                "bounds": bounds,
+                "reason": "地形图层存在，但没有可用的 iServer SCT 数据 URL",
+            }
+
+        return {
+            "status": "success",
+            "available": True,
+            "provider_type": "sct",
+            "scene_name": clean_name,
+            "service_name": service_name,
+            "scene_resource": scene_resource,
+            "terrain_url": terrain_url,
+            "layer_name": terrain_layer.get("dataName") or terrain_layer.get("name"),
+            "bounds": bounds,
+            "reason": None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "status": "degraded",
+            "available": False,
+            "provider_type": "ellipsoid",
+            "scene_name": scene_name,
+            "terrain_url": None,
+            "layer_name": None,
+            "bounds": None,
+            "reason": f"地形诊断失败：{str(e)[:200]}",
+        }
 
 
 # ---------------------------------------------------------------------------

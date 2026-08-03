@@ -1,0 +1,5 @@
+# Runtime requirements are listed in requirements.txt.
+pytest
+pytest-cov
+httpx
+playwright

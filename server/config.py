@@ -8,9 +8,10 @@ from pathlib import Path
 # 路径
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]  # src/tianyan-cangqiong
+APP_VERSION = "4.2.0"
 DATA_DIR = PROJECT_ROOT / "data"
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
-TIANYAN_ROOT = Path(os.getenv("TIANYAN_ROOT", r"D:\Work space\天眼寻珍"))
+TIANYAN_ROOT = Path(os.getenv("TIANYAN_ROOT", str(PROJECT_ROOT)))
 
 # 固定案例数据
 LUONAN_BOUNDARY = DATA_DIR / "luonan_boundary.geojson"

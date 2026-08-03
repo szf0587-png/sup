@@ -70,6 +70,8 @@ def init_db():
 
     # 创建所有表
     Base.metadata.create_all(bind=engine)
+    from scripts.migrate_v42 import migrate_v42
+    migrate_v42(engine)
     print(f"[database] 数据库初始化完成: {DATABASE_URL}")
 
     # 创建默认管理员账号（如果不存在）
