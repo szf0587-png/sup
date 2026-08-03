@@ -67,6 +67,7 @@
         const body = byId("asset-table-body");
         const empty = byId("empty-state");
         body.replaceChildren();
+        renderDataSourceTree();
         empty.classList.remove("is-error");
         empty.innerHTML = '<i class="fa-solid fa-box-open" aria-hidden="true"></i><strong>选择项目开始管理数据</strong><span>已登记的 iServer 服务会显示在这里。</span>';
         byId("asset-count").textContent = `${state.assets.length} 项`;
@@ -106,6 +107,82 @@
             body.appendChild(row);
         });
         if (state.selectedAsset) selectAsset(state.selectedAsset.id, false);
+    }
+
+    function renderDataSourceTree() {
+        const tree = byId("data-source-tree");
+        tree.replaceChildren();
+        const sources = new Map();
+        state.assets.forEach((asset) => {
+            const key = asset.datasource_name || "未命名数据源";
+            sources.set(key, [...(sources.get(key) || []), asset]);
+        });
+        if (!sources.size) {
+            const empty = document.createElement("span");
+            empty.className = "source-tree-empty";
+            empty.textContent = "暂无数据源";
+            tree.appendChild(empty);
+            return;
+        }
+        sources.forEach((assets, datasource) => {
+            const group = document.createElement("details");
+            group.open = true;
+            const summary = document.createElement("summary");
+            summary.textContent = datasource;
+            group.appendChild(summary);
+            assets.forEach((asset) => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "source-tree-item";
+                item.setAttribute("role", "treeitem");
+                item.textContent = asset.dataset_name;
+                item.addEventListener("click", () => selectAsset(asset.id));
+                group.appendChild(item);
+            });
+            tree.appendChild(group);
+        });
+    }
+
+    function renderGeoJsonPreview(preview) {
+        const host = byId("map-preview");
+        host.replaceChildren();
+        const collection = preview?.type === "FeatureCollection" ? preview : (preview?.features ? preview : null);
+        const features = collection?.features?.filter((feature) => feature?.geometry) || [];
+        if (!features.length) {
+            host.textContent = "没有可绘制的 GeoJSON 要素";
+            return;
+        }
+        const points = [];
+        const collect = (coordinates) => {
+            if (Array.isArray(coordinates) && coordinates.length >= 2 && Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1])) points.push(coordinates);
+            else if (Array.isArray(coordinates)) coordinates.forEach(collect);
+        };
+        features.forEach((feature) => collect(feature.geometry.coordinates));
+        if (!points.length) { host.textContent = "预览数据没有有效坐标"; return; }
+        const xs = points.map((point) => point[0]);
+        const ys = points.map((point) => point[1]);
+        const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+        const scale = (value, min, max, outputMin, outputMax) => max === min ? (outputMin + outputMax) / 2 : outputMin + ((value - min) / (max - min)) * (outputMax - outputMin);
+        const project = (point) => [scale(point[0], minX, maxX, 12, 288), scale(point[1], minY, maxY, 188, 12)];
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 300 200");
+        svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        const pathFor = (line, closed) => line.map((point, index) => `${index ? "L" : "M"}${project(point).join(" ")}`).join(" ") + (closed ? " Z" : "");
+        const appendGeometry = (geometry) => {
+            const type = geometry.type;
+            const lines = type === "LineString" ? [geometry.coordinates] : type === "MultiLineString" ? geometry.coordinates : type === "Polygon" ? geometry.coordinates : type === "MultiPolygon" ? geometry.coordinates.flat() : [];
+            if (type === "Point") {
+                const circle = document.createElementNS(svg.namespaceURI, "circle");
+                const point = project(geometry.coordinates); circle.setAttribute("cx", point[0]); circle.setAttribute("cy", point[1]); circle.setAttribute("r", "4"); svg.appendChild(circle); return;
+            }
+            lines.forEach((line) => {
+                const path = document.createElementNS(svg.namespaceURI, "path");
+                path.setAttribute("d", pathFor(line, type === "Polygon" || type === "MultiPolygon"));
+                svg.appendChild(path);
+            });
+        };
+        features.forEach((feature) => appendGeometry(feature.geometry));
+        host.appendChild(svg);
     }
 
     async function loadProjects() {
@@ -167,6 +244,7 @@
         publishButton.textContent = asset.lifecycle_status === "published" ? "取消发布" : "发布到 iServer";
         byId("metadata-output").textContent = loadRemote ? "正在读取…" : "保留上次读取结果";
         byId("preview-output").textContent = loadRemote ? "正在读取…" : "保留上次读取结果";
+        renderGeoJsonPreview(null);
         if (!loadRemote) return;
 
         byId("metadata-state").textContent = "读取中";
@@ -186,10 +264,12 @@
             const data = await readJson(response);
             if (!response.ok) throw new Error(getDetail(data, "预览不可用"));
             byId("preview-output").textContent = data.preview ? JSON.stringify(data.preview, null, 2) : (data.message || "该服务类型没有要素预览");
+            renderGeoJsonPreview(data.preview);
             byId("preview-state").textContent = data.preview ? "前 100 条" : "不适用";
         } catch (error) {
             byId("preview-output").textContent = error.message;
             byId("preview-state").textContent = "不可用";
+            renderGeoJsonPreview(null);
         }
     }
 

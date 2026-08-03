@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import uuid
 from datetime import datetime, timezone
@@ -75,6 +76,7 @@ class IServerAssetService:
         asset.lifecycle_status = "published"
         asset.is_active = True
         asset.service_url = result.get("service_url") or asset.service_url
+        asset.dataset_name = result.get("dataset_name") or asset.dataset_name
         asset.published_at = datetime.now(timezone.utc)
         asset.unpublished_at = None
         asset.last_error = None
@@ -84,7 +86,7 @@ class IServerAssetService:
 
     def unpublish(self, project_id: str, asset_id: str) -> IServerService:
         asset = self._owned_asset(project_id, asset_id)
-        if asset.lifecycle_status != "published":
+        if asset.lifecycle_status not in {"published", "publish_failed", "unpublish_failed"}:
             asset.lifecycle_status = "unpublished"
             asset.is_active = False
             asset.unpublished_at = datetime.now(timezone.utc)
@@ -132,7 +134,10 @@ class IServerAssetService:
 
     def delete(self, project_id: str, asset_id: str) -> IServerService:
         asset = self._owned_asset(project_id, asset_id)
-        requires_remote_delete = asset.lifecycle_status == "published" or (asset.dataset_id is None and asset.is_active)
+        requires_remote_delete = (
+            asset.lifecycle_status in {"published", "publish_failed", "unpublish_failed", "delete_failed"}
+            or (asset.dataset_id is None and asset.is_active)
+        )
         if requires_remote_delete:
             result = self.client.unpublish_service(asset.service_name)
             if result.get("status") not in {"unpublished", "not_found"}:
@@ -210,8 +215,14 @@ class IServerAssetService:
 
     @staticmethod
     def resource_name(user_id: str, project_id: str, dataset_name: str) -> str:
-        def clean(value: str, limit: int) -> str:
-            value = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
-            return (value[:limit] or "asset").rstrip("_")
+        def safe_label(value: str, fallback: str, limit: int) -> str:
+            label = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+            return (label[:limit].rstrip("_") or fallback)
 
-        return f"u_{clean(user_id, 8)}_p_{clean(project_id, 8)}_{clean(dataset_name, 96)}"
+        def short_hash(value: str) -> str:
+            return hashlib.sha256(value.encode("utf-8")).hexdigest()[:10]
+
+        user = f"{safe_label(user_id, 'user', 12)}_{short_hash(user_id)}"
+        project = f"{safe_label(project_id, 'project', 12)}_{short_hash(project_id)}"
+        dataset = f"{safe_label(dataset_name, 'asset', 48)}_{short_hash(dataset_name)}"
+        return f"u_{user}_p_{project}_{dataset}"

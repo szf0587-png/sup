@@ -1185,7 +1185,18 @@ def publish_dataset_file(dataset_path: str, service_name: str, datasource_alias:
     else:
         return {"status": "unsupported_format", "detail": "Only GeoJSON and UDBX datasets can be published", "service_url": None}
 
-    return publish_udbx_as_data_service(str(publish_path), service_name, datasource_alias)
+    try:
+        from server.integrations.udbx_publisher import _list_datasets
+
+        dataset_names = _list_datasets(publish_path)
+    except Exception as exc:
+        return {"status": "source_prepare_failed", "detail": str(exc), "service_url": None}
+    if not dataset_names:
+        return {"status": "source_prepare_failed", "detail": "Prepared UDBX contains no publishable dataset", "service_url": None}
+
+    result = publish_udbx_as_data_service(str(publish_path), service_name, datasource_alias)
+    result["dataset_name"] = dataset_names[0]
+    return result
 
 
 def unpublish_service(service_name: str) -> dict:

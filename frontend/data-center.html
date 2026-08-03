@@ -69,6 +69,10 @@
                     <div><p class="eyebrow">Registered Assets</p><h2 id="asset-heading">iServer 数据资产</h2></div>
                     <span class="panel-count" id="asset-count">0 项</span>
                 </header>
+                <section class="data-source-tree" aria-labelledby="source-tree-heading">
+                    <h3 id="source-tree-heading">数据源</h3>
+                    <div id="data-source-tree" role="tree"></div>
+                </section>
                 <div class="table-wrap">
                     <table class="asset-table">
                         <thead><tr><th>服务名称</th><th>类型</th><th>数据源 / 数据集</th><th>状态</th><th aria-label="操作"></th></tr></thead>
@@ -85,7 +89,7 @@
                     <div class="detail-title"><span class="service-type" id="detail-type">data</span><h3 id="detail-name">--</h3><p id="detail-url">--</p></div>
                     <dl class="detail-kv"><div><dt>数据源</dt><dd id="detail-datasource">--</dd></div><div><dt>数据集</dt><dd id="detail-dataset">--</dd></div><div><dt>登记时间</dt><dd id="detail-created">--</dd></div></dl>
                     <section class="detail-section"><header><h3>iServer 元数据</h3><span id="metadata-state">读取中</span></header><pre id="metadata-output">--</pre></section>
-                    <section class="detail-section"><header><h3>要素预览</h3><span id="preview-state">读取中</span></header><pre id="preview-output">--</pre></section>
+                    <section class="detail-section"><header><h3>要素预览</h3><span id="preview-state">读取中</span></header><div class="map-preview" id="map-preview" aria-label="GeoJSON 地图预览"></div><pre id="preview-output">--</pre></section>
                     <button class="primary-action" id="toggle-publish-asset" type="button">发布到 iServer</button>
                     <button class="danger-action" id="delete-asset-button" type="button"><i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>删除服务并移出项目</span></button>
                 </div>

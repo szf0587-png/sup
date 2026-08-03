@@ -158,10 +158,28 @@ def test_import_builds_project_and_user_scoped_resource_name(db):
 
     asset = IServerAssetService(db, owner).import_dataset(project.id, dataset.id)
 
-    assert asset.service_name == "u_user_own_p_project_county_boundary"
+    assert asset.service_name == IServerAssetService.resource_name(owner.id, project.id, dataset.name)
     assert asset.dataset_id == dataset.id
     assert asset.lifecycle_status == "imported"
     assert asset.last_error is None
+
+
+def test_resource_name_uses_full_identifiers_and_hashes_non_ascii_names():
+    first = IServerAssetService.resource_name(
+        "user_same_prefix_11111111", "project_same_prefix_11111111", "行政区划"
+    )
+    second = IServerAssetService.resource_name(
+        "user_same_prefix_22222222", "project_same_prefix_22222222", "行政区划"
+    )
+    empty_name = IServerAssetService.resource_name(
+        "user_same_prefix_11111111", "project_same_prefix_11111111", ""
+    )
+
+    assert first != second
+    assert first != empty_name
+    assert first.startswith("u_user_same_")
+    assert "asset_" in first
+    assert first.isascii()
 
 
 def test_import_rejects_duplicate_generated_resource_name(db):
@@ -228,6 +246,28 @@ def test_publish_records_failure_and_can_retry(db, monkeypatch, failure_status):
     assert published.published_at is not None
 
 
+def test_publish_persists_remote_dataset_identifier_used_by_preview(db, monkeypatch):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=["dataset_owner"])
+    dataset = _dataset(owner.id)
+    db.add_all([owner, project, dataset])
+    db.commit()
+    service = IServerAssetService(db, owner)
+    asset = service.import_dataset(project.id, dataset.id)
+    calls = []
+    monkeypatch.setattr(service.client, "publish_dataset_file", lambda *_: {
+        "status": "published", "service_url": "http://iserver/data", "dataset_name": "boundary_R"
+    })
+    monkeypatch.setattr(service.client, "get_data_service", lambda datasource, dataset_name, **_: calls.append((datasource, dataset_name)) or {"features": []})
+
+    service.publish(project.id, asset.id)
+    preview = service.preview(project.id, asset.id)
+
+    assert asset.dataset_name == "boundary_R"
+    assert preview == {"features": []}
+    assert calls == [(asset.datasource_name, "boundary_R")]
+
+
 def test_unpublish_updates_lifecycle_without_disclosing_credentials(db, monkeypatch):
     owner = _user("user_owner", "owner")
     project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=[])
@@ -252,6 +292,46 @@ def test_unpublish_updates_lifecycle_without_disclosing_credentials(db, monkeypa
     assert result.lifecycle_status == "unpublished"
     assert result.unpublished_at is not None
     assert result.is_active is False
+
+
+def test_unpublish_attempts_remote_cleanup_after_failed_publication(db, monkeypatch):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=[])
+    asset = IServerService(
+        id="service_owner", user_id=owner.id, project_id=project.id,
+        service_name="data-owner", service_type="data", datasource_name="owner_ds",
+        dataset_name="owner_layer", lifecycle_status="publish_failed", is_active=False,
+    )
+    db.add_all([owner, project, asset])
+    db.commit()
+    service = IServerAssetService(db, owner)
+    calls = []
+    monkeypatch.setattr(service.client, "unpublish_service", lambda name: calls.append(name) or {"status": "not_found"})
+
+    result = service.unpublish(project.id, asset.id)
+
+    assert calls == [asset.service_name]
+    assert result.lifecycle_status == "unpublished"
+
+
+def test_delete_attempts_remote_cleanup_after_failed_publication(db, monkeypatch):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=[])
+    asset = IServerService(
+        id="service_owner", user_id=owner.id, project_id=project.id,
+        service_name="data-owner", service_type="data", datasource_name="owner_ds",
+        dataset_name="owner_layer", lifecycle_status="publish_failed", is_active=False,
+    )
+    db.add_all([owner, project, asset])
+    db.commit()
+    service = IServerAssetService(db, owner)
+    calls = []
+    monkeypatch.setattr(service.client, "unpublish_service", lambda name: calls.append(name) or {"status": "unpublished"})
+
+    result = service.delete(project.id, asset.id)
+
+    assert calls == [asset.service_name]
+    assert result.is_deleted is True
 
 
 @pytest.mark.parametrize("operation", ["preview", "publish", "delete"])
