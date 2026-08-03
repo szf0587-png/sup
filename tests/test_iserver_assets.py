@@ -2,6 +2,7 @@
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from fastapi import HTTPException
 
@@ -194,6 +195,20 @@ def test_import_rejects_duplicate_generated_resource_name(db):
 
     with pytest.raises(HTTPException) as error:
         service.import_dataset(project.id, second.id)
+
+    assert error.value.status_code == 409
+
+
+def test_import_converts_database_resource_name_race_to_conflict(db, monkeypatch):
+    owner = _user("user_owner", "owner")
+    project = Project(id="project_owner", user_id=owner.id, name="Owner project", dataset_ids=["dataset_owner"])
+    dataset = _dataset(owner.id)
+    db.add_all([owner, project, dataset])
+    db.commit()
+    monkeypatch.setattr(db, "commit", lambda: (_ for _ in ()).throw(IntegrityError("insert", {}, Exception("unique"))))
+
+    with pytest.raises(HTTPException) as error:
+        IServerAssetService(db, owner).import_dataset(project.id, dataset.id)
 
     assert error.value.status_code == 409
 

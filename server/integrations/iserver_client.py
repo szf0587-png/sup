@@ -405,10 +405,40 @@ def get_data_service(datasource_name: str, dataset_name: str, max_features: int 
             timeout=15,
         )
         if r.status_code == 200:
-            return r.json()
+            return _feature_result_to_geojson(r.json(), max_features)
     except Exception:
         pass
     return None
+
+
+def _feature_result_to_geojson(payload: dict[str, Any], max_features: int) -> dict:
+    """Resolve iServer feature resources into the GeoJSON returned to browsers."""
+    result = _fetch_json_resource(payload.get("newResourceLocation")) if payload.get("newResourceLocation") else payload
+    raw_features = list(result.get("features") or []) if isinstance(result, dict) else []
+    feature_uris = list(result.get("featureUriList") or []) if isinstance(result, dict) else []
+    for uri in feature_uris[:max_features]:
+        raw_features.append(_fetch_json_resource(uri))
+
+    features = []
+    for raw_feature in raw_features[:max_features]:
+        if not isinstance(raw_feature, dict):
+            continue
+        geometry = supermap_to_geojson_geometry(raw_feature.get("geometry") or {})
+        if not geometry:
+            continue
+        properties = raw_feature.get("properties") if isinstance(raw_feature.get("properties"), dict) else {}
+        if not properties:
+            properties = dict(zip(raw_feature.get("fieldNames") or [], raw_feature.get("fieldValues") or []))
+        feature = {"type": "Feature", "properties": properties, "geometry": geometry}
+        if raw_feature.get("ID") is not None:
+            feature["id"] = raw_feature["ID"]
+        features.append(feature)
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "totalFeatures": int((result or {}).get("totalCount", len(features))),
+    }
 
 
 def list_data_datasets(datasource_name: str) -> list[str]:
@@ -1154,7 +1184,7 @@ def delete_service(service_name: str) -> bool:
             f"{ISERVER_BASE}/iserver/manager/services/data-{service_name}.json",
             timeout=15,
         )
-        return r.status_code in (200, 204)
+        return r.status_code in (200, 204, 404)
     except Exception:
         return False
 

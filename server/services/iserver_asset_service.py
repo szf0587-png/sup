@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from server.config import DATA_DIR
@@ -59,7 +60,14 @@ class IServerAssetService:
         )
         self.db.add(asset)
         dataset.iserver_service_id = asset.id
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An iServer resource with this generated name already exists",
+            ) from exc
         self.db.refresh(asset)
         return asset
 
