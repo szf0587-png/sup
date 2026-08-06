@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.114/Build/Cesium/Widgets/widgets.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@supermap/iclient3d-webgl@11.1.4/Cesium/Widgets/widgets.css">
     <link rel="stylesheet" href="vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026/Build/SuperMap3D/Widgets/widgets.css">
     <style>
         :root {
@@ -344,20 +345,31 @@
     function hideEngineFallback() { $("engine-fallback").hidden = true; }
     async function ensureEngine() {
         if (getEngine()) return getEngine();
-        // SuperMap 官方 WebGL CDN 已下线，如需真实 Realspace SCT 渲染，
-        // 请从 SuperMap 资源中心下载 iClient3D for WebGL 并自托管，
-        // 然后在页面中设置 window.SUPERMAP3D_URL 指向 Cesium.js。
+        const superMapCdnRoot = "https://cdn.jsdelivr.net/npm/@supermap/iclient3d-webgl@11.1.4/Cesium/";
+        window.CESIUM_BASE_URL = window.CESIUM_BASE_URL || superMapCdnRoot;
         const candidates = [
             "vendor/supermap3d/SuperMap3D.js",
             "vendor/supermap3d/Build/SuperMap3D/SuperMap3D.js",
             "vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026/Build/SuperMap3D/SuperMap3D.js",
             "vendor/supermap3d/Build/Cesium/Cesium.js",
             "vendor/supermap3d/Cesium.js",
+            `${superMapCdnRoot}Cesium.js`,
         ];
         if (window.SUPERMAP3D_URL) candidates.push(window.SUPERMAP3D_URL);
         candidates.push("https://cdn.jsdelivr.net/npm/cesium@1.114/Build/Cesium/Cesium.js");
-        for (const url of candidates) { try { await loadScript(url); if (getEngine()) break; } catch (error) { console.warn("3D 引擎候选不可用", url, error); } }
-        state.engine = getEngine(); if (!state.engine) throw new Error("三维引擎资源不可用"); $("engine-status").textContent = state.engine === window.SuperMap3D ? "SuperMap3D" : "Cesium 兼容模式"; return state.engine;
+        for (const url of candidates) {
+            try {
+                if (url.includes("@supermap/iclient3d-webgl")) window.CESIUM_BASE_URL = superMapCdnRoot;
+                await loadScript(url, url.includes("@supermap/iclient3d-webgl") ? 30000 : 12000);
+                if (getEngine()) break;
+            } catch (error) { console.warn("3D 引擎候选不可用", url, error); }
+        }
+        state.engine = getEngine();
+        if (!state.engine) throw new Error("三维引擎资源不可用");
+        $("engine-status").textContent = typeof state.engine.SuperMapTerrainProvider === "function" || state.engine.Scene?.prototype?.open
+            ? "SuperMap3D"
+            : "Cesium 兼容模式";
+        return state.engine;
     }
     function addReferenceImagery(viewer, engine) {
         if (!viewer.imageryLayers || !engine.UrlTemplateImageryProvider) return;
@@ -387,7 +399,7 @@
     }
     async function createTerrainProvider(engine) {
         // 优先使用iServer SCT地形（真实洛南县地形）
-        if (state.config?.terrain_url && engine === window.SuperMap3D && typeof engine.SuperMapTerrainProvider === "function") {
+        if (state.config?.terrain_url && typeof engine.SuperMapTerrainProvider === "function") {
             try {
                 const provider = new engine.SuperMapTerrainProvider({
                     url: state.config.terrain_url,
@@ -418,6 +430,26 @@
         // 降级方案2：平面地球
         console.log('[3D] 无可用地形，使用平面模式');
         return null;
+    }
+    async function openLegacyRealspace(viewer) {
+        const terrainLayer = state.config?.layers?.find(isTerrainLayer);
+        const addLayer = viewer.scene?.addS3MTilesLayerByScp;
+        if (!terrainLayer || typeof addLayer !== "function" || !state.config?.terrain_url) return false;
+        const terrainConfigUrl = `${state.config.terrain_url.replace(/\/$/, "")}/config`;
+        try {
+            state.terrainLayer = await addLayer.call(viewer.scene, terrainConfigUrl, {
+                name: terrainLayer.name || terrainLayer.data_name || "SCT 地形",
+                isVisible: true,
+            });
+            state.realspaceOpened = true;
+            $("engine-status").textContent = "SuperMap Realspace";
+            $("map-subtitle").textContent = "真实 iServer SCT 地形已打开";
+            return true;
+        } catch (error) {
+            console.warn("[3D] 旧版 iClient3D SCT 图层加载失败", error);
+            state.terrainLayer = null;
+            return false;
+        }
     }
     function applyCamera() { if (!state.viewer || !state.config?.initial_view) return; const engine = state.engine; const view = state.config.initial_view; const height = Math.max(SAFE_CAMERA_HEIGHT, Number(view.height) * 4); state.viewer.camera.setView({ destination: engine.Cartesian3.fromDegrees(view.longitude, view.latitude, height), orientation: { heading: engine.Math.toRadians(view.heading || 0), pitch: engine.Math.toRadians(-35), roll: 0 } }); }
     async function openRealspace() {
@@ -457,8 +489,13 @@
                 showEngineFallback(`Realspace 打开失败：${error.message}`);
                 toast(`Realspace 打开失败，保留场景信息：${error.message}`);
             }
+        } else if (await openLegacyRealspace(viewer)) {
+            // The npm iClient3D build exposes the legacy layer API instead of scene.open.
+        } else {
+            state.realspaceOpened = false;
+            $("engine-status").textContent = "Cesium 兼容模式";
+            $("map-subtitle").textContent = "已读取 iServer 场景配置，等待 SuperMap3D 运行库";
         }
-        else { state.realspaceOpened = false; $("engine-status").textContent = "Cesium 兼容模式"; $("map-subtitle").textContent = "已读取 iServer 场景配置，等待 SuperMap3D 运行库"; }
         if (state.terrainProvider && viewer.terrainProvider !== state.terrainProvider) terrain.setVisible(true);
         applyCamera();
     }
@@ -511,12 +548,34 @@
     }
     function setTilt() { setTerrainPerspective(); }
     function setExaggeration(value) { state.terrainController?.setExaggeration(value); $("terrain-up").setAttribute("aria-pressed", String(value === 2)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
+    function findSceneLayer(collection, name) {
+        if (!collection || !name) return null;
+        if (typeof collection.find === "function") {
+            try {
+                const direct = collection.find(name);
+                if (direct) return direct;
+            } catch (error) { /* collection.find may expect a predicate */ }
+            try {
+                const byName = collection.find((candidate) => candidate?.name === name || candidate?.caption === name);
+                if (byName) return byName;
+            } catch (error) { /* ignore unsupported collection implementations */ }
+        }
+        const length = Number(collection.length ?? collection._layers?.length ?? 0);
+        if (typeof collection.get === "function") {
+            for (let index = 0; index < length; index += 1) {
+                const candidate = collection.get(index);
+                if (candidate?.name === name || candidate?.caption === name) return candidate;
+            }
+        }
+        if (Array.isArray(collection)) return collection.find((candidate) => candidate?.name === name || candidate?.caption === name) || null;
+        return null;
+    }
     function toggleTerrain(visible, source) {
         if (!state.viewer || !state.engine) return;
         state.terrainController?.setVisible(visible);
         const collection = state.viewer.scene?.layers;
         const name = source?.name || source?.caption || source?.data_name || source?.dataName;
-        let layer = collection?.find && name ? collection.find(name) : null;
+        let layer = state.terrainLayer || findSceneLayer(collection, name);
         if (!layer && collection?.get && state.terrainLayerIndex >= 0) layer = collection.get(state.terrainLayerIndex);
         if (layer && "visible" in layer) layer.visible = visible;
         setStatus(`${source?.caption || source?.name || source?.data_name || "地形图层"} ${visible ? "已显示" : "已隐藏"}`);

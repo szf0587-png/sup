@@ -149,6 +149,11 @@ def list_land_assessment_capabilities() -> dict[str, Any]:
     realspace_services = iserver_client.list_realspace_services() if online else []
     spatial_analyst = iserver_client.has_spatial_analyst_service() if online else False
     available = set(china_datasets)
+    dem_available = any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}) or any(
+        bool(scene.get("terrain_available"))
+        for scene in realspace_services
+        if isinstance(scene, dict)
+    )
     water_available = any(layer["dataset"] in available for layer in DEFAULT_CONSTRAINT_LAYERS)
     road_available = any(layer["dataset_name"] in available for layer in DEFAULT_ROAD_LAYERS)
     admin_available = "Province_R" in available
@@ -170,13 +175,13 @@ def list_land_assessment_capabilities() -> dict[str, Any]:
             "administrative": ([{"datasource": "China100", "dataset": "Province_R", "label": "Provinces"}] if admin_available else []),
         },
         "published_datasets": china_datasets,
-        "dem_available": any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}),
+        "dem_available": dem_available,
         "realspace_available": bool(realspace_services),
         "3d_scenes": realspace_services,
         "tool_availability": tool_availability,
         "unavailable": [
             item for item, enabled in {
-                "DEM terrain analysis": any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}),
+                "DEM terrain analysis": dem_available,
                 "land-use suitability classification": False,
                 "3D Realspace verification": not bool(realspace_services),
             }.items() if not enabled

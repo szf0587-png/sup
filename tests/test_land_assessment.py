@@ -107,6 +107,19 @@ class LandAssessmentTests(unittest.TestCase):
         self.assertFalse(caps["spatial_analyst"])
         self.assertFalse(caps["tool_availability"]["buffer"]["available"])
 
+    def test_capabilities_detect_dem_published_by_realspace_service(self):
+        with patch.object(land_service.iserver_client, "check_iserver", return_value=True), patch.object(
+            land_service.iserver_client, "list_basemap_services", return_value=[]
+        ), patch.object(land_service.iserver_client, "list_data_datasets", return_value=[]), patch.object(
+            land_service.iserver_client,
+            "list_realspace_services",
+            return_value=[{"scene_name": "luonan", "service_name": "3D-luonan", "terrain_available": True}],
+        ), patch.object(land_service.iserver_client, "has_spatial_analyst_service", return_value=False):
+            caps = land_service.list_land_assessment_capabilities()
+
+        self.assertTrue(caps["dem_available"])
+        self.assertTrue(caps["realspace_available"])
+
     def test_diagnostic_returns_map_ready_feature_collection(self):
         water = {"feature_count": 2, "source": "iserver:data-China100", "visualization": feature_collection()}
         with patch.object(land_service, "overlay_constraint_stats", return_value=water):
