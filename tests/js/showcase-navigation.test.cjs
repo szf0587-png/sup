@@ -54,3 +54,10 @@ test('showcase config rewrites allowed destinations through the deployment login
     '/index.html',
   );
 });
+
+test('showcase defaults to the running local workbench port', () => {
+  const context = { window: {} };
+  vm.runInNewContext(showcaseConfig, context);
+
+  assert.equal(context.window.TIANYAN_WORKBENCH_BASE, 'http://127.0.0.1:8010');
+});
