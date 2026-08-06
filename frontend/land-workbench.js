@@ -163,6 +163,8 @@
         },
         activeAnalysis: null,
         assessmentCompleted: false,
+        agentConversationId: null,
+        agentProvider: null,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -205,6 +207,74 @@
         }
         return fetch(url, options);
     };
+
+    function workbenchEvidence() {
+        const completed = Object.entries(state.toolResults).map(([id, item]) => ({
+            tool: ALL_ANALYSIS_TOOLS[id]?.label || id,
+            result: item.detail,
+        }));
+        return JSON.stringify({
+            purpose: "土地资源评估分析与决策支持",
+            boundary_selected: Boolean(state.boundary),
+            completed_analysis: completed,
+            capabilities: state.capabilities ? {
+                iserver_online: state.capabilities.iServer,
+                dem_available: state.capabilities.dem_available,
+                realspace_available: state.capabilities.realspace_available,
+                published_datasets: state.capabilities.published_datasets,
+            } : "未加载",
+            instruction: "基于这些证据提出下一步分析或决策建议；证据不足时必须说明缺口。",
+        });
+    }
+
+    function appendAgentMessage(role, content) {
+        const box = $("agent-messages");
+        if (!box) return;
+        const intro = box.querySelector(".agent-intro");
+        if (intro) intro.remove();
+        const item = document.createElement("article");
+        item.className = `agent-message ${role}`;
+        item.textContent = content;
+        box.appendChild(item);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    async function ensureAgentConversation() {
+        if (state.agentConversationId) return state.agentConversationId;
+        const created = await authedFetch(`${API}/api/ai/conversations`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: "工作台分析决策" }),
+        });
+        if (!created.ok) throw new Error("请先登录并配置 AI 供应商");
+        state.agentConversationId = (await created.json()).conversation.id;
+        return state.agentConversationId;
+    }
+
+    async function sendToDecisionAgent(content) {
+        const input = $("agent-input");
+        const question = String(content || input?.value || "").trim();
+        if (!question) return;
+        try {
+            const providersResponse = await authedFetch(`${API}/api/ai/providers`);
+            if (!providersResponse.ok) throw new Error("请先登录后使用分析决策智能体");
+            const providers = (await providersResponse.json()).providers || [];
+            if (!providers.length) throw new Error("请先配置 AI 供应商与 API Key");
+            state.agentProvider = state.agentProvider || providers[0].provider;
+            const conversationId = await ensureAgentConversation();
+            appendAgentMessage("user", question);
+            if (input) input.value = "";
+            $("agent-evidence").textContent = `已引用 ${Object.keys(state.toolResults).length} 项阶段成果和当前数据能力`;
+            const response = await authedFetch(`${API}/api/ai/conversations/${conversationId}/messages`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: question, provider: state.agentProvider, context: workbenchEvidence() }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.detail || "智能体请求失败");
+            appendAgentMessage("assistant", payload.message.content);
+        } catch (error) {
+            toast(error instanceof Error ? error.message : "智能体请求失败", "error");
+        }
+    }
 
     function toast(message, type = "info") {
         const region = $("toast-region");
@@ -1459,6 +1529,21 @@
     }
 
     function bindEvents() {
+        $("open-decision-agent").addEventListener("click", () => {
+            $("decision-agent").classList.add("is-open");
+            $("decision-agent").setAttribute("aria-hidden", "false");
+        });
+        $("close-decision-agent").addEventListener("click", () => {
+            $("decision-agent").classList.remove("is-open");
+            $("decision-agent").setAttribute("aria-hidden", "true");
+        });
+        $("agent-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+            sendToDecisionAgent();
+        });
+        document.querySelectorAll("[data-agent-prompt]").forEach((button) => {
+            button.addEventListener("click", () => sendToDecisionAgent(button.dataset.agentPrompt));
+        });
         $("refresh-capabilities").addEventListener("click", loadCapabilities);
         $("reset-workflow").addEventListener("click", clearWorkflow);
         $("login-link").addEventListener("click", () => {

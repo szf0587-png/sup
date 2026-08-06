@@ -58,3 +58,26 @@ def test_chat_requires_a_configured_key(db):
         AIChatService(db, owner).send_message(conversation.id, "请介绍平台", "openai")
 
     assert error.value.status_code == 422
+
+
+def test_chat_passes_workbench_context_to_the_decision_agent(db, monkeypatch):
+    owner = user("owner")
+    db.add(owner)
+    db.commit()
+    service = AIChatService(db, owner)
+    service.save_provider("openai", "https://api.openai.com/v1", "gpt-4o-mini", "sk-test-secret")
+    conversation = service.create_conversation("项目咨询")
+    captured = {}
+
+    class Response:
+        def raise_for_status(self): pass
+        def json(self): return {"choices": [{"message": {"content": "建议先完成水体约束分析"}}]}
+
+    def fake_post(*args, **kwargs):
+        captured.update(kwargs["json"])
+        return Response()
+
+    monkeypatch.setattr("server.services.ai_chat_service.requests.post", fake_post)
+    service.send_message(conversation.id, "下一步做什么", "openai", context="已完成：范围统计；DEM 未发布")
+
+    assert "DEM 未发布" in captured["messages"][0]["content"]

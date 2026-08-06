@@ -21,7 +21,7 @@
             <button class="nav-button" type="button" aria-label="三维场景"><i class="fa-solid fa-cube"></i></button>
             <button class="nav-button" type="button" aria-label="报告"><i class="fa-solid fa-file-lines"></i></button>
             <a class="nav-button nav-link" href="golden_standard.html" aria-label="模型库"><i class="fa-solid fa-database"></i></a>
-            <a class="nav-button" href="ai-chat.html" aria-label="AI 助手" title="AI 助手"><i class="fa-solid fa-comments"></i></a>
+            <button class="nav-button" id="open-decision-agent" type="button" aria-label="分析决策智能体" title="分析决策智能体"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
         </aside>
 
         <main class="workbench">
@@ -198,6 +198,14 @@
     </dialog>
 
     <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <aside class="decision-agent" id="decision-agent" aria-label="分析决策智能体" aria-hidden="true">
+        <header class="decision-agent-header"><div><p class="eyebrow">Decision Agent</p><h2>分析决策智能体</h2><small id="agent-evidence">正在读取工作台证据</small></div><button class="icon-button small-icon-button" id="close-decision-agent" type="button" aria-label="关闭智能体" title="关闭"><i class="fa-solid fa-xmark"></i></button></header>
+        <div class="agent-messages" id="agent-messages"><section class="agent-intro"><i class="fa-solid fa-wand-magic-sparkles"></i><h3>基于当前工作台证据决策</h3><p>我会结合评估范围、已完成分析、数据能力和阶段结果，给出下一步分析建议与依据。</p></section></div>
+        <div class="agent-quick-actions"><button type="button" data-agent-prompt="根据当前证据，下一步应该运行什么分析？">下一步分析</button><button type="button" data-agent-prompt="请评估当前证据是否足以形成选址决策，并说明缺口。">决策就绪度</button></div>
+        <form class="agent-composer" id="agent-form"><textarea id="agent-input" rows="2" maxlength="8000" placeholder="询问当前项目的分析与决策建议"></textarea><button class="primary-action" type="submit" aria-label="发送给分析决策智能体" title="发送"><i class="fa-solid fa-arrow-up"></i></button></form>
+        <footer><a href="ai-chat.html">配置 AI 供应商与 API Key</a></footer>
+    </aside>
 
     <script src="auth.js"></script>
     <script src="vendor/leaflet/leaflet.js"></script>

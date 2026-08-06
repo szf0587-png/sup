@@ -1576,6 +1576,41 @@ dd {
     border-left-color: var(--danger);
 }
 
+.decision-agent {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 60;
+    width: min(420px, 100vw);
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto auto;
+    background: var(--surface);
+    border-left: 1px solid var(--line);
+    box-shadow: -12px 0 32px rgba(17, 43, 38, 0.18);
+    transform: translateX(105%);
+    transition: transform 180ms ease;
+}
+
+.decision-agent.is-open { transform: translateX(0); }
+.decision-agent-header { display:flex; justify-content:space-between; gap:12px; padding:20px; border-bottom:1px solid var(--line); }
+.decision-agent-header h2 { margin:3px 0; font-size:18px; }
+.decision-agent-header small { color:var(--muted); font-size:12px; }
+.agent-messages { overflow:auto; padding:18px; display:grid; align-content:start; gap:12px; }
+.agent-intro { text-align:center; color:var(--muted); padding:48px 20px; }
+.agent-intro i { color:var(--primary); font-size:26px; }
+.agent-intro h3 { color:var(--text); font-size:16px; }
+.agent-message { max-width:90%; padding:11px 12px; border-radius:6px; white-space:pre-wrap; line-height:1.55; font-size:13px; }
+.agent-message.user { justify-self:end; background:#dff1ed; }
+.agent-message.assistant { background:var(--surface-muted); }
+.agent-quick-actions { display:flex; flex-wrap:wrap; gap:7px; padding:10px 18px; border-top:1px solid var(--line); }
+.agent-quick-actions button { border:1px solid var(--line); background:var(--surface); color:var(--primary-dark); padding:7px 9px; border-radius:5px; cursor:pointer; font:inherit; font-size:12px; }
+.agent-composer { display:flex; align-items:end; gap:8px; padding:12px 18px; border-top:1px solid var(--line); }
+.agent-composer textarea { flex:1; min-height:40px; resize:none; font:inherit; border:1px solid var(--line-strong); border-radius:5px; padding:9px; }
+.agent-composer .primary-action { min-width:40px; padding:10px; }
+.decision-agent footer { padding:0 18px 18px; font-size:12px; }
+.decision-agent footer a { color:var(--primary-dark); }
+
 .leaflet-control-container .leaflet-top,
 .leaflet-control-container .leaflet-bottom {
     z-index: 8;

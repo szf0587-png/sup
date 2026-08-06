@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from server.models.ai_chat import AIConversation, AIMessage, AIProviderConfig
 from server.models.user import User
 
-SYSTEM_PROMPT = "You are the land-resource assessment workbench assistant. Answer concisely and only about using this platform, GIS data management, and land-resource assessment."
+SYSTEM_PROMPT = "You are a land-resource assessment decision agent. Use only the supplied workbench evidence when making a recommendation. State missing data or unfinished analysis clearly. Do not invent scores, spatial facts, or regulatory conclusions. Give a concise next action, rationale, and confidence limitation."
 
 
 def _cipher() -> Fernet:
@@ -73,7 +73,7 @@ class AIChatService:
         self._conversation(conversation_id)
         return self.db.query(AIMessage).filter_by(conversation_id=conversation_id).order_by(AIMessage.created_at).all()
 
-    def send_message(self, conversation_id: str, content: str, provider: str) -> AIMessage:
+    def send_message(self, conversation_id: str, content: str, provider: str, context: str = "") -> AIMessage:
         conversation = self._conversation(conversation_id)
         config = self.db.query(AIProviderConfig).filter_by(user_id=self.user.id, provider=provider, is_active=True).first()
         if not config:
@@ -83,7 +83,9 @@ class AIChatService:
             raise HTTPException(status_code=422, detail="Message is required")
         history = self.messages(conversation_id)[-12:]
         user_message = AIMessage(id=f"msg_{uuid.uuid4().hex[:16]}", conversation_id=conversation.id, role="user", content=content)
-        payload = {"model": config.model, "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + [{"role": m.role, "content": m.content} for m in history] + [{"role": "user", "content": content}], "temperature": 0.3}
+        decision_context = context.strip()[:12000]
+        system_content = SYSTEM_PROMPT + (f"\n\nCURRENT WORKBENCH EVIDENCE:\n{decision_context}" if decision_context else "")
+        payload = {"model": config.model, "messages": [{"role": "system", "content": system_content}] + [{"role": m.role, "content": m.content} for m in history] + [{"role": "user", "content": content}], "temperature": 0.3}
         try:
             key = _cipher().decrypt(config.encrypted_api_key.encode("ascii")).decode("utf-8")
             response = requests.post(f"{config.base_url}/chat/completions", headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, json=payload, timeout=45)
