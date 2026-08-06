@@ -1576,6 +1576,13 @@ dd {
     border-left-color: var(--danger);
 }
 
+.analysis-tool.is-unavailable,
+.analysis-tool.is-unavailable:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+    border-style: dashed;
+}
+
 .decision-agent {
     position: fixed;
     top: 0;

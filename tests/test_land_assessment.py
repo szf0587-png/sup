@@ -96,6 +96,7 @@ class LandAssessmentTests(unittest.TestCase):
             land_service.iserver_client, "list_basemap_services", return_value=[]
         ), patch.object(land_service.iserver_client, "list_data_datasets", return_value=["Water_R", "NationalRd_L"]), patch.object(
             land_service.iserver_client, "list_realspace_services", return_value=[]
+        ), patch.object(land_service.iserver_client, "has_spatial_analyst_service", return_value=False
         ):
             caps = land_service.list_land_assessment_capabilities()
 
@@ -103,6 +104,8 @@ class LandAssessmentTests(unittest.TestCase):
         self.assertIn("water_constraint", caps["components"])
         self.assertFalse(caps["dem_available"])
         self.assertFalse(caps["realspace_available"])
+        self.assertFalse(caps["spatial_analyst"])
+        self.assertFalse(caps["tool_availability"]["buffer"]["available"])
 
     def test_diagnostic_returns_map_ready_feature_collection(self):
         water = {"feature_count": 2, "source": "iserver:data-China100", "visualization": feature_collection()}

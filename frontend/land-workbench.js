@@ -194,6 +194,11 @@
             button.className = "analysis-tool";
             button.type = "button";
             button.dataset.tool = id;
+            const availability = state.capabilities?.tool_availability?.[id];
+            if (availability && !availability.available) {
+                button.classList.add("is-unavailable");
+                button.title = availability.reason;
+            }
             button.innerHTML = `<i class="fa-solid ${TOOL_ICONS[id] || tool.icon || "fa-gears"}"></i><span>${escapeHtml(tool.label)}</span>`;
             return button;
         }));
@@ -943,13 +948,14 @@
             setChip("iserver-chip", caps.iServer ? "iServer 在线" : "iServer 离线", caps.iServer ? "is-online" : "is-offline");
             setChip("scene-chip", `${caps["3d_scenes"]?.length || 0} 个 3D 场景`, caps["3d_scenes"]?.length ? "is-online" : "is-warning");
             setCapability("cap-overlay", caps.spatial_analyst ? "可调用" : "未发布");
-            setCapability("cap-dem", caps.land_layers?.water?.length && caps.land_layers?.roads?.length ? "已发布" : "未发布");
+            setCapability("cap-dem", caps.land_layers?.water?.length || caps.land_layers?.roads?.length ? "部分发布" : "未发布");
             setCapability("cap-raster", caps.dem_available ? "可调用" : "未发布");
             setCapability("cap-scenes", caps.realspace_available ? "可调用" : "未发布");
             const view3d = $("view-3d");
             view3d.disabled = !caps.realspace_available;
             view3d.title = caps.realspace_available ? "三维视图" : "未发布 Realspace 三维服务";
             if (!caps.realspace_available && state.mode === "3d") setView("2d");
+            renderToolbox();
             await loadUserBasemaps();
 
         } catch (error) {
@@ -1402,7 +1408,11 @@
             const completed = Boolean(state.toolResults[id]);
             button.classList.toggle("is-complete", completed);
             button.classList.toggle("is-running", state.runningTool === id);
-            button.disabled = state.runningTool === id;
+            const availability = state.capabilities?.tool_availability?.[id];
+            const unavailable = Boolean(availability && !availability.available);
+            button.classList.toggle("is-unavailable", unavailable);
+            button.disabled = state.runningTool === id || unavailable;
+            if (unavailable) button.title = availability.reason;
         });
     }
 
@@ -1438,6 +1448,11 @@
         }
         const tool = ALL_ANALYSIS_TOOLS[toolId];
         if (!tool) return;
+        const availability = state.capabilities?.tool_availability?.[toolId];
+        if (availability && !availability.available) {
+            toast(availability.reason, "error");
+            return;
+        }
         state.runningTool = toolId;
         updateToolButtons();
         try {
@@ -1521,10 +1536,12 @@
     }
 
     function bindEvents() {
-        $("open-decision-agent").addEventListener("click", () => {
+        const openDecisionAgent = () => {
             $("decision-agent").classList.add("is-open");
             $("decision-agent").setAttribute("aria-hidden", "false");
-        });
+        };
+        $("open-decision-agent").addEventListener("click", openDecisionAgent);
+        $("open-decision-agent-top").addEventListener("click", openDecisionAgent);
         $("close-decision-agent").addEventListener("click", () => {
             $("decision-agent").classList.remove("is-open");
             $("decision-agent").setAttribute("aria-hidden", "true");

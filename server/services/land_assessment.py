@@ -147,21 +147,33 @@ def list_land_assessment_capabilities() -> dict[str, Any]:
     basemaps = iserver_client.list_basemap_services() if online else []
     china_datasets = iserver_client.list_data_datasets("China100") if online else []
     realspace_services = iserver_client.list_realspace_services() if online else []
+    spatial_analyst = iserver_client.has_spatial_analyst_service() if online else False
     available = set(china_datasets)
+    water_available = any(layer["dataset"] in available for layer in DEFAULT_CONSTRAINT_LAYERS)
+    road_available = any(layer["dataset_name"] in available for layer in DEFAULT_ROAD_LAYERS)
+    admin_available = "Province_R" in available
+    tool_availability = {
+        "land_summary": {"available": True, "reason": "使用当前边界进行本地面积统计"},
+        "water_constraint": {"available": water_available, "reason": "需要已发布的 China100 水体数据服务"},
+        "buffer": {"available": spatial_analyst, "reason": "需要已发布的 iServer Spatial Analyst 服务"},
+        "road_access": {"available": road_available, "reason": "需要已发布的 China100 道路数据服务"},
+        "admin_context": {"available": admin_available, "reason": "需要已发布的 China100 行政区数据服务"},
+    }
     return {
         "iServer": online,
-        "spatial_analyst": online,
+        "spatial_analyst": spatial_analyst,
         "basemaps": basemaps,
         "recommended_basemap": basemaps[0] if basemaps else None,
         "land_layers": {
-            "water": [layer for layer in DEFAULT_CONSTRAINT_LAYERS if not available or layer["dataset"] in available],
-            "roads": [layer for layer in DEFAULT_ROAD_LAYERS if not available or layer["dataset_name"] in available],
-            "administrative": [{"datasource": "China100", "dataset": "Province_R", "label": "Provinces"}],
+            "water": [layer for layer in DEFAULT_CONSTRAINT_LAYERS if layer["dataset"] in available],
+            "roads": [layer for layer in DEFAULT_ROAD_LAYERS if layer["dataset_name"] in available],
+            "administrative": ([{"datasource": "China100", "dataset": "Province_R", "label": "Provinces"}] if admin_available else []),
         },
         "published_datasets": china_datasets,
         "dem_available": any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}),
         "realspace_available": bool(realspace_services),
         "3d_scenes": realspace_services,
+        "tool_availability": tool_availability,
         "unavailable": [
             item for item, enabled in {
                 "DEM terrain analysis": any(name in available for name in {"GridToDEMCache", "DEM", "LuonanDEM"}),

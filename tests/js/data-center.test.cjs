@@ -37,3 +37,10 @@ test('workbench diagnostics do not ask users for an internal project ID', () => 
   const js = fs.readFileSync(path.join(root, 'frontend', 'land-workbench.js'), 'utf8');
   assert.doesNotMatch(js, /dialog-project-id/);
 });
+
+test('workbench exposes an obvious decision-agent entry and honors tool availability', () => {
+  const workbench = fs.readFileSync(path.join(root, 'frontend', 'index.html'), 'utf8');
+  const js = fs.readFileSync(path.join(root, 'frontend', 'land-workbench.js'), 'utf8');
+  assert.match(workbench, /id="open-decision-agent-top"/);
+  assert.match(js, /tool_availability/);
+});

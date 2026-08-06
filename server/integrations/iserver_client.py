@@ -174,6 +174,15 @@ def _spatial_analysis_base_url() -> str:
     raise RuntimeError("no published Spatial Analyst service was found")
 
 
+def has_spatial_analyst_service() -> bool:
+    """Return whether this iServer has actually published Spatial Analyst."""
+    try:
+        _spatial_analysis_base_url()
+        return True
+    except Exception:
+        return False
+
+
 def list_native_spatial_operations() -> dict[str, list[dict[str, Any]]]:
     """Discover the raw operation resources actually published by Spatial Analyst."""
     base_url = f"{_spatial_analysis_base_url().rstrip('/')}/spatialanalyst"
