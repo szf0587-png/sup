@@ -6,6 +6,7 @@ const CONSOLE_PATHS = new Set([
     "/iserver-tools.html",
     "/map3d.html",
     "/golden_standard.html",
+    "/ai-chat.html",
 ]);
 
 function resolveNextPath(rawValue, fallback = "/index.html") {

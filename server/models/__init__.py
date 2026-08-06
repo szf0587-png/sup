@@ -6,6 +6,7 @@ from server.models.analysis_task import AnalysisTask
 from server.models.gee_credential import GEECredential
 from server.models.iserver_service import IServerService
 from server.models.golden_standard import GoldenStandard
+from server.models.ai_chat import AIProviderConfig, AIConversation, AIMessage
 
 __all__ = [
     "User",
@@ -15,4 +16,7 @@ __all__ = [
     "GEECredential",
     "IServerService",
     "GoldenStandard",
+    "AIProviderConfig",
+    "AIConversation",
+    "AIMessage",
 ]

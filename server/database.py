@@ -65,7 +65,7 @@ def init_db():
     # 导入所有模型（确保 Base.metadata 包含所有表）
     from server.models import (
         user, dataset, project, analysis_task,
-        gee_credential, iserver_service, golden_standard
+        gee_credential, iserver_service, golden_standard, ai_chat
     )
 
     # 创建所有表

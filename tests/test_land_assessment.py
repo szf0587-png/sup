@@ -94,7 +94,9 @@ class LandAssessmentTests(unittest.TestCase):
     def test_capabilities_only_expose_real_components(self):
         with patch.object(land_service.iserver_client, "check_iserver", return_value=True), patch.object(
             land_service.iserver_client, "list_basemap_services", return_value=[]
-        ), patch.object(land_service.iserver_client, "list_data_datasets", return_value=["Water_R", "NationalRd_L"]):
+        ), patch.object(land_service.iserver_client, "list_data_datasets", return_value=["Water_R", "NationalRd_L"]), patch.object(
+            land_service.iserver_client, "list_realspace_services", return_value=[]
+        ):
             caps = land_service.list_land_assessment_capabilities()
 
         self.assertTrue(caps["iServer"])

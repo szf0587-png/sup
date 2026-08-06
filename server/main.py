@@ -74,6 +74,9 @@ app.include_router(projects_router)
 from server.api.iserver_assets import router as iserver_assets_router
 app.include_router(iserver_assets_router)
 
+from server.api.ai_chat import router as ai_chat_router
+app.include_router(ai_chat_router)
+
 # ================================
 # Phase 1 — 金标准 CRUD（已迁移）
 # ================================
