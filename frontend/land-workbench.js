@@ -104,7 +104,6 @@
     const MAX_PINNED_TOOLS = 6;
 
     const DEFAULT_ANALYSIS_OPTIONS = {
-        project_id: "",
         target_use: "general",
         buffer_distance_m: 1000,
         use_3d: true,
@@ -972,7 +971,6 @@
         const roadDataset = (options.road_dataset || "").trim();
         return {
             boundary: state.boundary,
-            project_id: (options.project_id || "").trim() || null,
             target_use: options.target_use || "general",
             buffer_distance_m: Number(options.buffer_distance_m) || 0,
             use_3d: Boolean(options.use_3d),
@@ -1032,10 +1030,6 @@
             .join("")}</select></label>`;
     }
 
-    function commonProjectMarkup() {
-        return fieldMarkup("dialog-project-id", "项目 ID", state.analysisOptions.project_id, { placeholder: "可选" });
-    }
-
     function processingField(id, label, value, options = {}) {
         return fieldMarkup(`processing-${id}`, label, value, options);
     }
@@ -1075,14 +1069,13 @@
         const roads = `<div class="dialog-grid">${fieldMarkup("dialog-road-datasource", "道路数据源", options.road_datasource, { placeholder: "数据源" })}${fieldMarkup("dialog-road-dataset", "道路数据集", options.road_dataset, { placeholder: "数据集" })}</div>`;
         const threeD = `<div class="dialog-section"><label class="dialog-toggle"><input id="dialog-use-3d" type="checkbox"${options.use_3d ? " checked" : ""}><span>启用 3D 场景核验</span></label>${sceneMarkup(options.scene_name)}</div>`;
 
-        if (action === "land_summary" || action === "admin_context") return `${commonProjectMarkup()}`;
-        if (action === "water_constraint") return `${constraints}${commonProjectMarkup()}`;
-        if (action === "buffer") return `${bufferDistance}${commonProjectMarkup()}`;
-        if (action === "road_access") return `${roads}${commonProjectMarkup()}`;
+        if (action === "land_summary" || action === "admin_context") return "无需额外参数，直接使用当前评估范围。";
+        if (action === "water_constraint") return constraints;
+        if (action === "buffer") return bufferDistance;
+        if (action === "road_access") return roads;
 
         return `
             ${targetUse}
-            ${commonProjectMarkup()}
             <section class="dialog-section"><h3 class="dialog-section-title">空间分析</h3>${bufferDistance}${constraints}${roads}</section>
             <section class="dialog-section"><h3 class="dialog-section-title">因子权重</h3><div class="weight-grid">
                 ${fieldMarkup("dialog-weight-terrain", "地形", options.weights.terrain, { type: "number", min: 0, max: 1, step: 0.01 })}
@@ -1101,7 +1094,6 @@
         const previous = state.analysisOptions;
         const next = {
             ...previous,
-            project_id: readDialogValue("dialog-project-id", previous.project_id).trim(),
             target_use: readDialogValue("dialog-target-use", previous.target_use),
             buffer_distance_m: Number(readDialogValue("dialog-buffer-distance", previous.buffer_distance_m)) || 0,
             constraint_datasets: readDialogValue("dialog-constraint-datasets", previous.constraint_datasets).trim(),

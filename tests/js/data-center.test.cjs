@@ -32,3 +32,8 @@ test('data center page keeps service registration and offline state visible', ()
   assert.match(js, /showToast/);
   assert.match(js, /iServer/);
 });
+
+test('workbench diagnostics do not ask users for an internal project ID', () => {
+  const js = fs.readFileSync(path.join(root, 'frontend', 'land-workbench.js'), 'utf8');
+  assert.doesNotMatch(js, /dialog-project-id/);
+});
