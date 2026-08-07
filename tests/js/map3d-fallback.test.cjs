@@ -35,3 +35,11 @@ test('terrain camera keeps the published scene altitude instead of forcing a hig
   assert.match(html, /Math\.max\(1200, Number\(view\.height\) \* 1\.35\)/);
   assert.match(html, /pitch: engine\.Math\.toRadians\(-48\)/);
 });
+
+test('native Realspace terrain reapplies elevation exaggeration after the scene configuration loads', () => {
+  assert.match(html, /exaggeration: 2/);
+  const openAt = html.indexOf('await viewer.scene.open(state.config.scene_url)');
+  const nativeLoad = html.slice(openAt, openAt + 900);
+
+  assert.match(nativeLoad, /setExaggeration\(2\)/);
+});

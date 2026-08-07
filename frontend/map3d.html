@@ -218,7 +218,7 @@
 <script>
 (function () {
     "use strict";
-    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainController: null, terrainDiagnostics: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 1, nativeCatalog: null, activeOperation: null, toastTimer: null };
+    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainController: null, terrainDiagnostics: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 2, nativeCatalog: null, activeOperation: null, toastTimer: null };
     const SAFE_CAMERA_HEIGHT = 7200;
     const $ = (id) => document.getElementById(id);
     const knownOperationHints = { geometryBuffer3D: "三维缓冲区", geometry3DMinDistance: "三维最短距离", geometryViewShedBody: "三维可视域", geometrySkylineSectorBody: "天际线扇区", geometryDrone3DGridPathPlanning: "无人机三维网格路径规划" };
@@ -472,6 +472,7 @@
                 state.realspaceOpened = true;
                 nativeTerrainOpened = Boolean(state.terrainDiagnostics?.available);
                 state.terrainEnabled = nativeTerrainOpened;
+                setExaggeration(2);
                 $("engine-status").textContent = "SuperMap Realspace";
                 const sctReady = nativeTerrainOpened;
                 $("map-subtitle").textContent = sctReady
