@@ -43,3 +43,12 @@ test('native Realspace terrain reapplies elevation exaggeration after the scene 
 
   assert.match(nativeLoad, /setExaggeration\(2\)/);
 });
+
+test('map control buttons invoke camera actions and the scene mode button toggles both directions', () => {
+  assert.match(html, /\$\("home-view"\)\.addEventListener\("click", homeView\)/);
+  assert.match(html, /\$\("tilt-view"\)\.addEventListener\("click", setTilt\)/);
+  assert.match(html, /function toggleSceneMode\(\)/);
+  assert.match(html, /scene\.morphTo2D\(0\.7\)/);
+  assert.match(html, /scene\.morphTo3D\(0\.7\)/);
+  assert.match(html, /\$\("scene-mode"\)\.addEventListener\("click", toggleSceneMode\)/);
+});
