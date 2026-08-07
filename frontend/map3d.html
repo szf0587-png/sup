@@ -163,7 +163,7 @@
             <p class="section-label">显示控制</p>
             <div class="toolbar">
                 <button class="tool-button terrain-view-button" id="terrain-perspective" type="button" title="切换到立体地形视角"><i class="fa-solid fa-mountain-sun"></i>立体视角</button>
-                <button class="tool-button" id="terrain-up" type="button"><i class="fa-solid fa-mountain-sun"></i>地形 ×2</button>
+                <button class="tool-button" id="terrain-up" type="button"><i class="fa-solid fa-mountain-sun"></i>地形 ×4</button>
                 <button class="tool-button" id="terrain-down" type="button"><i class="fa-solid fa-mountain"></i>地形 ×1</button>
             </div>
         </div>
@@ -218,7 +218,7 @@
 <script>
 (function () {
     "use strict";
-    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainController: null, terrainDiagnostics: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 2, nativeCatalog: null, activeOperation: null, toastTimer: null };
+    const state = { scenes: [], selected: null, config: null, viewer: null, engine: null, terrainProvider: null, terrainController: null, terrainDiagnostics: null, terrainEnabled: false, terrainLayerIndex: -1, realspaceOpened: false, exaggeration: 4, nativeCatalog: null, activeOperation: null, toastTimer: null };
     const SAFE_CAMERA_HEIGHT = 7200;
     const $ = (id) => document.getElementById(id);
     const knownOperationHints = { geometryBuffer3D: "三维缓冲区", geometry3DMinDistance: "三维最短距离", geometryViewShedBody: "三维可视域", geometrySkylineSectorBody: "天际线扇区", geometryDrone3DGridPathPlanning: "无人机三维网格路径规划" };
@@ -472,7 +472,7 @@
                 state.realspaceOpened = true;
                 nativeTerrainOpened = Boolean(state.terrainDiagnostics?.available);
                 state.terrainEnabled = nativeTerrainOpened;
-                setExaggeration(2);
+                setExaggeration(4);
                 $("engine-status").textContent = "SuperMap Realspace";
                 const sctReady = nativeTerrainOpened;
                 $("map-subtitle").textContent = sctReady
@@ -555,24 +555,24 @@
         });
     }
     function setTilt() { setTerrainPerspective(); }
-    function setExaggeration(value) { state.terrainController?.setExaggeration(value); $("terrain-up").setAttribute("aria-pressed", String(value === 2)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
-    function toggleSceneMode() {
-        if (!state.viewer || !state.engine) return;
-        const scene = state.viewer.scene;
-        const is2D = state.engine.SceneMode?.SCENE2D != null && scene.mode === state.engine.SceneMode.SCENE2D;
+    function setExaggeration(value) { state.terrainController?.setExaggeration(value); $("terrain-up").setAttribute("aria-pressed", String(value === 4)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
+    function toggleReferenceImagery() {
+        if (!state.viewer?.imageryLayers) return;
+        const imageryLayers = state.viewer.imageryLayers;
+        if (!imageryLayers.length) return;
+        const visible = imageryLayers.get(0).show !== false;
+        for (let index = 0; index < imageryLayers.length; index += 1) imageryLayers.get(index).show = !visible;
         const button = $("scene-mode");
-        if (is2D) {
-            scene.morphTo3D(0.7);
-            button.setAttribute("aria-label", "切换二维模式");
-            button.setAttribute("title", "切换二维模式");
-            button.setAttribute("aria-pressed", "false");
-            setStatus("已恢复三维场景");
-        } else {
-            scene.morphTo2D(0.7);
-            button.setAttribute("aria-label", "恢复三维模式");
-            button.setAttribute("title", "恢复三维模式");
+        if (visible) {
+            button.setAttribute("aria-label", "显示影像底图");
+            button.setAttribute("title", "显示影像底图");
             button.setAttribute("aria-pressed", "true");
-            setStatus("已切换二维模式");
+            setStatus("已隐藏影像底图，保留三维地形");
+        } else {
+            button.setAttribute("aria-label", "隐藏影像底图");
+            button.setAttribute("title", "隐藏影像底图");
+            button.setAttribute("aria-pressed", "false");
+            setStatus("已显示影像底图");
         }
     }
     function findSceneLayer(collection, name) {
@@ -630,7 +630,7 @@
     async function executeNative(event) { event.preventDefault(); if (!state.activeOperation) return; let parameters; try { parameters = JSON.parse($("native-parameters").value || "{}"); } catch { toast("参数必须是合法 JSON"); return; } const submit = $("native-form").querySelector("button[value='default']"); submit.disabled = true; $("result-state").textContent = "运行中"; try { const payload = await api("/api/spatial-analysis/native-execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation_id: state.activeOperation.operationId, parameters, dataset_path: $("native-dataset-path").value.trim() || state.activeOperation.datasetPath || null }) }); $("result-state").textContent = "完成"; $("result-box").innerHTML = `<strong>iServer 已返回结果</strong><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`; addResultMarker(); toast("三维分析工具执行完成"); $("native-dialog").close(); } catch (error) { $("result-state").textContent = "失败"; $("result-box").textContent = error.message; toast(error.message || "工具执行失败"); } finally { submit.disabled = false; } }
     function addResultMarker() { if (!state.viewer || !state.engine || !state.config?.initial_view) return; const view = state.config.initial_view; state.viewer.entities.add({ position: state.engine.Cartesian3.fromDegrees(view.longitude, view.latitude, Math.max(50, view.height / 10)), point: { pixelSize: 12, color: state.engine.Color.fromCssColorString("#69c7d2"), outlineColor: state.engine.Color.WHITE, outlineWidth: 2 }, label: { text: "分析结果", fillColor: state.engine.Color.WHITE, showBackground: true, backgroundColor: state.engine.Color.fromCssColorString("#0d1916").withAlpha(.9), pixelOffset: new state.engine.Cartesian2(0, -18) } }); }
     function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])); }
-    $("scene-select").addEventListener("change", loadSelectedScene); $("refresh-scenes").addEventListener("click", loadScenes); $("open-rest").addEventListener("click", () => { if (state.config?.scene_resource_url) window.open(state.config.scene_resource_url, "_blank", "noopener"); }); $("back-2d").addEventListener("click", () => { window.location.href = "index.html"; }); $("toggle-inspector").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("toggle-inspector-mobile").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("home-view").addEventListener("click", homeView); $("locate-terrain").addEventListener("click", locateTerrain); $("terrain-perspective").addEventListener("click", setTerrainPerspective); $("tilt-view").addEventListener("click", setTilt); $("scene-mode").addEventListener("click", toggleSceneMode); $("terrain-up").addEventListener("click", () => setExaggeration(2)); $("terrain-down").addEventListener("click", () => setExaggeration(1)); $("native-form").addEventListener("submit", (event) => { if (event.submitter?.value === "cancel") { state.activeOperation = null; return; } executeNative(event); });
+    $("scene-select").addEventListener("change", loadSelectedScene); $("refresh-scenes").addEventListener("click", loadScenes); $("open-rest").addEventListener("click", () => { if (state.config?.scene_resource_url) window.open(state.config.scene_resource_url, "_blank", "noopener"); }); $("back-2d").addEventListener("click", () => { window.location.href = "index.html"; }); $("toggle-inspector").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("toggle-inspector-mobile").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("home-view").addEventListener("click", homeView); $("locate-terrain").addEventListener("click", locateTerrain); $("terrain-perspective").addEventListener("click", setTerrainPerspective); $("tilt-view").addEventListener("click", setTilt); $("scene-mode").addEventListener("click", toggleReferenceImagery); $("terrain-up").addEventListener("click", () => setExaggeration(4)); $("terrain-down").addEventListener("click", () => setExaggeration(1)); $("native-form").addEventListener("submit", (event) => { if (event.submitter?.value === "cancel") { state.activeOperation = null; return; } executeNative(event); });
     loadNativeCatalog(); loadScenes();
 })();
 </script>

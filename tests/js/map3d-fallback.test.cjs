@@ -37,18 +37,18 @@ test('terrain camera keeps the published scene altitude instead of forcing a hig
 });
 
 test('native Realspace terrain reapplies elevation exaggeration after the scene configuration loads', () => {
-  assert.match(html, /exaggeration: 2/);
+  assert.match(html, /exaggeration: 4/);
   const openAt = html.indexOf('await viewer.scene.open(state.config.scene_url)');
   const nativeLoad = html.slice(openAt, openAt + 900);
 
-  assert.match(nativeLoad, /setExaggeration\(2\)/);
+  assert.match(nativeLoad, /setExaggeration\(4\)/);
 });
 
-test('map control buttons invoke camera actions and the scene mode button toggles both directions', () => {
+test('map control buttons invoke camera actions and the globe button toggles imagery without leaving 3D', () => {
   assert.match(html, /\$\("home-view"\)\.addEventListener\("click", homeView\)/);
   assert.match(html, /\$\("tilt-view"\)\.addEventListener\("click", setTilt\)/);
-  assert.match(html, /function toggleSceneMode\(\)/);
-  assert.match(html, /scene\.morphTo2D\(0\.7\)/);
-  assert.match(html, /scene\.morphTo3D\(0\.7\)/);
-  assert.match(html, /\$\("scene-mode"\)\.addEventListener\("click", toggleSceneMode\)/);
+  assert.match(html, /function toggleReferenceImagery\(\)/);
+  assert.match(html, /imageryLayers\.get\(index\)\.show/);
+  assert.doesNotMatch(html, /morphTo2D\(0\.7\)/);
+  assert.match(html, /\$\("scene-mode"\)\.addEventListener\("click", toggleReferenceImagery\)/);
 });
