@@ -343,24 +343,36 @@
     }
     function getEngine() { return window.SuperMap3D || window.Cesium; }
     function loadScript(url, timeout = 7000) { return new Promise((resolve, reject) => { const script = document.createElement("script"); script.src = url; script.async = true; const timer = setTimeout(() => { script.remove(); reject(new Error("引擎资源超时")); }, timeout); script.onload = () => { clearTimeout(timer); resolve(); }; script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error("引擎资源不可用")); }; document.head.appendChild(script); }); }
+    function getIserverRuntimeRoot() {
+        if (!state.config?.scene_url) return null;
+        try {
+            const sceneUrl = new URL(state.config.scene_url, window.location.href);
+            const servicesIndex = sceneUrl.pathname.indexOf("/services/");
+            const contextPath = servicesIndex >= 0 ? sceneUrl.pathname.slice(0, servicesIndex) : "/iserver";
+            return `${sceneUrl.origin}${contextPath}/static/iClient3DForWebGL/`;
+        } catch (error) { return null; }
+    }
     function showEngineFallback(message) { const scene = state.selected || {}; const config = state.config || {}; $("engine-fallback").hidden = false; $("fallback-message").textContent = message; $("fallback-scene").textContent = config.scene_resource || scene.scenes?.[0]?.name || "默认场景"; $("fallback-dataset").textContent = scene.datasets?.[0]?.name || scene.layers?.[0]?.dataName || "--"; $("fallback-type").textContent = scene.layers?.[0]?.layer3DType || scene.layers?.[0]?.cacheType || "Realspace"; $("fallback-rest").href = config.scene_resource_url || config.scene_url || "#"; $("engine-status").textContent = "场景信息模式"; $("map-subtitle").textContent = "已读取 iServer 配置，等待 SuperMap3D 运行库"; }
     function hideEngineFallback() { $("engine-fallback").hidden = true; }
     async function ensureEngine() {
         if (getEngine()) return getEngine();
+        const iserverRuntimeRoot = getIserverRuntimeRoot();
         const superMapCdnRoot = "https://cdn.jsdelivr.net/npm/@supermap/iclient3d-webgl@11.1.4/Cesium/";
-        window.CESIUM_BASE_URL = window.CESIUM_BASE_URL || superMapCdnRoot;
+        window.CESIUM_BASE_URL = iserverRuntimeRoot || window.CESIUM_BASE_URL || superMapCdnRoot;
         const candidates = [
+            iserverRuntimeRoot && `${iserverRuntimeRoot}SuperMap3D.js`,
             "vendor/supermap3d/SuperMap3D.js",
             "vendor/supermap3d/Build/SuperMap3D/SuperMap3D.js",
             "vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026/Build/SuperMap3D/SuperMap3D.js",
             "vendor/supermap3d/Build/Cesium/Cesium.js",
             "vendor/supermap3d/Cesium.js",
             `${superMapCdnRoot}Cesium.js`,
-        ];
+        ].filter(Boolean);
         if (window.SUPERMAP3D_URL) candidates.push(window.SUPERMAP3D_URL);
         candidates.push("https://cdn.jsdelivr.net/npm/cesium@1.114/Build/Cesium/Cesium.js");
         for (const url of candidates) {
             try {
+                if (url.includes("iClient3DForWebGL")) window.CESIUM_BASE_URL = iserverRuntimeRoot;
                 if (url.includes("@supermap/iclient3d-webgl")) window.CESIUM_BASE_URL = superMapCdnRoot;
                 await loadScript(url, url.includes("@supermap/iclient3d-webgl") ? 30000 : 12000);
                 if (getEngine()) break;
@@ -482,10 +494,13 @@
         let nativeTerrainOpened = false;
         if (typeof viewer.scene.open === "function" && state.config?.scene_url) {
             try {
-                await viewer.scene.open(state.config.scene_url);
+                const openedLayers = await viewer.scene.open(state.config.scene_url, state.config.scene_resource, { autoSetView: false });
                 state.realspaceOpened = true;
                 const terrainSource = state.config.layers?.find(isTerrainLayer);
-                state.terrainLayer = await waitForTerrainLayer(viewer, terrainSource);
+                state.terrainLayer = Array.isArray(openedLayers)
+                    ? openedLayers.find((layer) => layer?.name === terrainSource?.name || layer?.name === terrainSource?.caption) || null
+                    : null;
+                state.terrainLayer ||= await waitForTerrainLayer(viewer, terrainSource);
                 nativeTerrainOpened = Boolean(state.terrainLayer);
                 state.terrainEnabled = nativeTerrainOpened;
                 if (nativeTerrainOpened) setExaggeration(4);
@@ -575,6 +590,7 @@
     function setExaggeration(value) { state.terrainController?.setExaggeration(value); $("terrain-up").setAttribute("aria-pressed", String(value === 4)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
     function toggleReferenceImagery() {
         if (!state.viewer?.imageryLayers) return;
+        if (!state.terrainLayer) { toast("SCT 地形尚未渲染，不能隐藏影像底图"); return; }
         const imageryLayers = state.viewer.imageryLayers;
         if (!imageryLayers.length) return;
         const visible = imageryLayers.get(0).show !== false;
