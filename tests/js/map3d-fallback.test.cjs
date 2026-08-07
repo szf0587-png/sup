@@ -53,12 +53,12 @@ test('Realspace reports SCT as open only after its TerrainFileLayer exists in th
   assert.doesNotMatch(html, /nativeTerrainOpened = Boolean\(state\.terrainDiagnostics\?\.available\)/);
 });
 
-test('map control buttons invoke camera actions and the globe button toggles imagery without leaving 3D', () => {
+test('map controls keep the native terrain visible and only toggle terrain lighting', () => {
   assert.match(html, /\$\("home-view"\)\.addEventListener\("click", homeView\)/);
   assert.match(html, /\$\("tilt-view"\)\.addEventListener\("click", setTilt\)/);
-  assert.match(html, /function toggleReferenceImagery\(\)/);
-  assert.match(html, /if \(!state\.terrainLayer\) \{ toast\("SCT 地形尚未渲染，不能隐藏影像底图"\); return; \}/);
-  assert.match(html, /imageryLayers\.get\(index\)\.show/);
+  assert.match(html, /function toggleTerrainLighting\(\)/);
+  assert.match(html, /scene\.globe\.enableLighting = !enabled/);
+  assert.doesNotMatch(html, /server\.arcgisonline\.com/);
   assert.doesNotMatch(html, /morphTo2D\(0\.7\)/);
-  assert.match(html, /\$\("scene-mode"\)\.addEventListener\("click", toggleReferenceImagery\)/);
+  assert.match(html, /\$\("scene-mode"\)\.addEventListener\("click", toggleTerrainLighting\)/);
 });

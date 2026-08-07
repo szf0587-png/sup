@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.114/Build/Cesium/Widgets/widgets.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@supermap/iclient3d-webgl@11.1.4/Cesium/Widgets/widgets.css">
-    <link rel="stylesheet" href="vendor/supermap3d/supermap-iclient3d-for-webgl_webgpu-2026/Build/SuperMap3D/Widgets/widgets.css">
     <link rel="stylesheet" href="app-shell.css">
     <style>
         :root {
@@ -192,7 +191,7 @@
             <div class="map-controls" aria-label="地图控制">
                 <button class="icon-button" id="home-view" type="button" aria-label="定位场景" title="定位场景"><i class="fa-solid fa-crosshairs"></i></button>
                 <button class="icon-button" id="tilt-view" type="button" aria-label="立体地形视角" title="立体地形视角"><i class="fa-solid fa-arrows-up-down"></i></button>
-                <button class="icon-button" id="scene-mode" type="button" aria-label="切换球体模式" title="切换球体模式"><i class="fa-solid fa-globe"></i></button>
+                <button class="icon-button" id="scene-mode" type="button" aria-label="切换地形光照" title="切换地形光照" aria-pressed="false"><i class="fa-solid fa-sun"></i></button>
             </div>
             <div class="map-legend"><span><i class="legend-dot" style="background:var(--green)"></i>Realspace</span><span><i class="legend-dot" style="background:var(--cyan)"></i>分析结果</span><span><i class="legend-dot" style="background:var(--amber)"></i>场景信息</span></div>
         </section>
@@ -385,21 +384,11 @@
             : "Cesium 兼容模式";
         return state.engine;
     }
-    function addReferenceImagery(viewer, engine) {
-        if (!viewer.imageryLayers || !engine.UrlTemplateImageryProvider) return;
-        const imageryUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-        try {
-            viewer.imageryLayers.addImageryProvider(new engine.UrlTemplateImageryProvider({ url: imageryUrl, maximumLevel: 19 }));
-        } catch (error) {
-            console.warn("影像底图不可用，保留 Realspace 地形", error);
-        }
-    }
     function createViewer(engine) {
         if (state.viewer) return state.viewer;
         state.engine = engine;
         state.viewer = new engine.Viewer("cesium-container", { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, infoBox: false, selectionIndicator: false, imageryProvider: false, terrainProvider: new engine.EllipsoidTerrainProvider() });
         if (state.viewer._cesiumWidget?._creditContainer) state.viewer._cesiumWidget._creditContainer.style.display = "none";
-        addReferenceImagery(state.viewer, engine);
         const cameraController = state.viewer.scene.screenSpaceCameraController;
         if (cameraController) { cameraController.enableRotate = true; cameraController.enableTilt = true; cameraController.enableZoom = true; cameraController.enableLook = true; }
         if (state.viewer.scene.globe) state.viewer.scene.globe.depthTestAgainstTerrain = true;
@@ -588,24 +577,23 @@
     }
     function setTilt() { setTerrainPerspective(); }
     function setExaggeration(value) { state.terrainController?.setExaggeration(value); $("terrain-up").setAttribute("aria-pressed", String(value === 4)); $("terrain-down").setAttribute("aria-pressed", String(value === 1)); setStatus(`地形夸张 ${value}×`); }
-    function toggleReferenceImagery() {
-        if (!state.viewer?.imageryLayers) return;
-        if (!state.terrainLayer) { toast("SCT 地形尚未渲染，不能隐藏影像底图"); return; }
-        const imageryLayers = state.viewer.imageryLayers;
-        if (!imageryLayers.length) return;
-        const visible = imageryLayers.get(0).show !== false;
-        for (let index = 0; index < imageryLayers.length; index += 1) imageryLayers.get(index).show = !visible;
+    function toggleTerrainLighting() {
+        const scene = state.viewer?.scene;
+        if (!scene?.globe) return;
+        const enabled = Boolean(scene.globe.enableLighting);
+        scene.globe.enableLighting = !enabled;
+        scene.requestRender?.();
         const button = $("scene-mode");
-        if (visible) {
-            button.setAttribute("aria-label", "显示影像底图");
-            button.setAttribute("title", "显示影像底图");
-            button.setAttribute("aria-pressed", "true");
-            setStatus("已隐藏影像底图，保留三维地形");
-        } else {
-            button.setAttribute("aria-label", "隐藏影像底图");
-            button.setAttribute("title", "隐藏影像底图");
+        if (enabled) {
+            button.setAttribute("aria-label", "开启地形光照");
+            button.setAttribute("title", "开启地形光照");
             button.setAttribute("aria-pressed", "false");
-            setStatus("已显示影像底图");
+            setStatus("已关闭地形光照");
+        } else {
+            button.setAttribute("aria-label", "关闭地形光照");
+            button.setAttribute("title", "关闭地形光照");
+            button.setAttribute("aria-pressed", "true");
+            setStatus("已开启地形光照");
         }
     }
     function findSceneLayer(collection, name) {
@@ -663,7 +651,7 @@
     async function executeNative(event) { event.preventDefault(); if (!state.activeOperation) return; let parameters; try { parameters = JSON.parse($("native-parameters").value || "{}"); } catch { toast("参数必须是合法 JSON"); return; } const submit = $("native-form").querySelector("button[value='default']"); submit.disabled = true; $("result-state").textContent = "运行中"; try { const payload = await api("/api/spatial-analysis/native-execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation_id: state.activeOperation.operationId, parameters, dataset_path: $("native-dataset-path").value.trim() || state.activeOperation.datasetPath || null }) }); $("result-state").textContent = "完成"; $("result-box").innerHTML = `<strong>iServer 已返回结果</strong><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`; addResultMarker(); toast("三维分析工具执行完成"); $("native-dialog").close(); } catch (error) { $("result-state").textContent = "失败"; $("result-box").textContent = error.message; toast(error.message || "工具执行失败"); } finally { submit.disabled = false; } }
     function addResultMarker() { if (!state.viewer || !state.engine || !state.config?.initial_view) return; const view = state.config.initial_view; state.viewer.entities.add({ position: state.engine.Cartesian3.fromDegrees(view.longitude, view.latitude, Math.max(50, view.height / 10)), point: { pixelSize: 12, color: state.engine.Color.fromCssColorString("#69c7d2"), outlineColor: state.engine.Color.WHITE, outlineWidth: 2 }, label: { text: "分析结果", fillColor: state.engine.Color.WHITE, showBackground: true, backgroundColor: state.engine.Color.fromCssColorString("#0d1916").withAlpha(.9), pixelOffset: new state.engine.Cartesian2(0, -18) } }); }
     function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])); }
-    $("scene-select").addEventListener("change", loadSelectedScene); $("refresh-scenes").addEventListener("click", loadScenes); $("open-rest").addEventListener("click", () => { if (state.config?.scene_resource_url) window.open(state.config.scene_resource_url, "_blank", "noopener"); }); $("back-2d").addEventListener("click", () => { window.location.href = "index.html"; }); $("toggle-inspector").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("toggle-inspector-mobile").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("home-view").addEventListener("click", homeView); $("locate-terrain").addEventListener("click", locateTerrain); $("terrain-perspective").addEventListener("click", setTerrainPerspective); $("tilt-view").addEventListener("click", setTilt); $("scene-mode").addEventListener("click", toggleReferenceImagery); $("terrain-up").addEventListener("click", () => setExaggeration(4)); $("terrain-down").addEventListener("click", () => setExaggeration(1)); $("native-form").addEventListener("submit", (event) => { if (event.submitter?.value === "cancel") { state.activeOperation = null; return; } executeNative(event); });
+    $("scene-select").addEventListener("change", loadSelectedScene); $("refresh-scenes").addEventListener("click", loadScenes); $("open-rest").addEventListener("click", () => { if (state.config?.scene_resource_url) window.open(state.config.scene_resource_url, "_blank", "noopener"); }); $("back-2d").addEventListener("click", () => { window.location.href = "index.html"; }); $("toggle-inspector").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("toggle-inspector-mobile").addEventListener("click", () => $("inspector").classList.toggle("is-open")); $("home-view").addEventListener("click", homeView); $("locate-terrain").addEventListener("click", locateTerrain); $("terrain-perspective").addEventListener("click", setTerrainPerspective); $("tilt-view").addEventListener("click", setTilt); $("scene-mode").addEventListener("click", toggleTerrainLighting); $("terrain-up").addEventListener("click", () => setExaggeration(4)); $("terrain-down").addEventListener("click", () => setExaggeration(1)); $("native-form").addEventListener("submit", (event) => { if (event.submitter?.value === "cancel") { state.activeOperation = null; return; } executeNative(event); });
     loadNativeCatalog(); loadScenes();
 })();
 </script>
