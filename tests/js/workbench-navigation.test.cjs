@@ -9,5 +9,11 @@ const html = fs.readFileSync(
 );
 
 test('workbench three-dimensional navigation opens the real map3d page', () => {
-  assert.match(html, /<a[^>]+href="map3d\.html"[^>]+aria-label="三维场景"/);
+  assert.match(html, /<script src="shell-navigation\.js"><\/script>/);
+
+  const navigation = fs.readFileSync(
+    path.resolve(__dirname, '..', '..', 'frontend', 'shell-navigation.js'),
+    'utf8',
+  );
+  assert.match(navigation, /href: "map3d\.html"/);
 });

@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app-shell.css">
 
     <script>
         tailwind.config = {
@@ -31,69 +32,47 @@
     </script>
     <style>
         :root {
-            --glass-bg: rgba(15, 23, 42, 0.85);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --tech-green: #10b981;
-            --tech-gold: #f59e0b;
+            --glass-bg: rgba(255, 255, 255, 0.94);
+            --glass-border: #d7e2dc;
+            --tech-green: #2c9972;
+            --tech-gold: #71d5a2;
         }
         body {
-            background-color: #050511;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.15) 0, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.1) 0, transparent 50%);
-            color: #f0f4f8;
+            background-color: #eef4f1;
+            color: #1d2925;
             overflow: hidden;
         }
         .glass-panel {
             background: var(--glass-bg);
-            backdrop-filter: blur(16px);
+            backdrop-filter: blur(10px);
             border: 1px solid var(--glass-border);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(16, 33, 28, 0.08);
         }
         /* Leaflet Dark Mode Override */
         .leaflet-container {
-            background: #0f172a !important;
+            background: #dce9e3 !important;
         }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background: rgba(15, 23, 42, 0.9);
-            color: white;
+            background: #ffffff;
+            color: #1d2925;
             border: 1px solid var(--tech-green);
         }
+        /* Keep the model workflow in the same visual language as the workbench. */
+        .bg-tech-black\/80 { background-color: #f7faf8 !important; }
+        .bg-tech-gold { background-color: var(--tech-gold) !important; }
+        .hover\:bg-yellow-500:hover { background-color: #8ce2b5 !important; }
+        .text-tech-gold { color: #217253 !important; }
+        .border-tech-gold\/20 { border-color: rgba(44, 153, 114, .24) !important; }
+        .border-tech-gold { border-color: var(--tech-green) !important; }
+        .bg-tech-gold\/20 { background-color: rgba(44, 153, 114, .12) !important; }
+        .bg-gradient-to-b.from-tech-gold\/5 { background-image: none !important; }
+        #extract-btn, #save-btn { border-radius: 8px; box-shadow: 0 6px 16px rgba(44, 153, 114, .18); }
+        #search-btn { border-radius: 6px; background: #e6efea; color: #385046; }
+        #search-btn:hover { background: #d8e6df; }
     </style>
 </head>
 <body class="h-screen w-screen flex relative">
-
-    <!-- 侧边栏导航 -->
-    <div class="w-64 h-full p-4 z-20 flex flex-col gap-4">
-        <!-- Logo Area -->
-        <div class="glass-panel p-4 rounded-2xl flex items-center gap-3">
-            <i class="fa-solid fa-earth-americas text-tech-gold text-2xl"></i>
-            <div>
-                <h1 class="font-bold text-sm tracking-widest">TERROIR</h1>
-                <h2 class="text-xs text-tech-gold tracking-widest">HUNTER</h2>
-            </div>
-        </div>
-
-        <!-- Menu -->
-        <div class="glass-panel p-4 rounded-2xl flex-1 flex flex-col gap-3">
-            <div class="text-xs text-gray-500 uppercase tracking-widest mb-2 px-2">Navigation</div>
-            
-            <a href="index.html" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-all">
-                <i class="fa-solid fa-satellite text-lg w-6 text-center"></i>
-                <span>主控制台</span>
-            </a>
-
-            <a href="data-center.html" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-all">
-                <i class="fa-solid fa-database text-lg w-6 text-center"></i>
-                <span>项目数据</span>
-            </a>
-            
-            <a href="#" class="flex items-center gap-3 p-3 rounded-xl bg-tech-gold/10 border border-tech-gold/30 text-tech-gold transition-all">
-                <i class="fa-solid fa-cube text-lg w-6 text-center"></i>
-                <span>风土标尺库</span>
-            </a>
-        </div>
-    </div>
 
     <!-- 主内容区 -->
     <div class="flex-1 flex h-full relative overflow-hidden">
@@ -244,6 +223,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="shell-navigation.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="golden_standard.js"></script>

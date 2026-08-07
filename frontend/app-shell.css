@@ -1,0 +1,114 @@
+:root {
+    --app-nav-width: 68px;
+    --app-nav-bg: #10211d;
+    --app-nav-line: rgba(208, 231, 220, .14);
+    --app-nav-text: #aabdb3;
+    --app-nav-active: #eef8f2;
+    --app-nav-accent: #71d5a2;
+}
+
+body.has-app-navigation {
+    padding-left: var(--app-nav-width);
+}
+
+.app-navigation {
+    position: fixed;
+    z-index: 100;
+    inset: 0 auto 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: var(--app-nav-width);
+    padding: 14px 10px;
+    border-right: 1px solid var(--app-nav-line);
+    background: var(--app-nav-bg);
+}
+
+.app-navigation__brand,
+.app-navigation__link {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+}
+
+.app-navigation__brand {
+    margin-bottom: 16px;
+    color: #08120f;
+    background: var(--app-nav-accent);
+    font-size: 17px;
+}
+
+.app-navigation__list {
+    display: grid;
+    gap: 6px;
+    width: 100%;
+}
+
+.app-navigation__link {
+    position: relative;
+    width: 100%;
+    color: var(--app-nav-text);
+    text-decoration: none;
+    transition: color 160ms ease, background-color 160ms ease;
+}
+
+.app-navigation__link:hover,
+.app-navigation__link[aria-current="page"] {
+    color: var(--app-nav-active);
+    background: rgba(255, 255, 255, .11);
+}
+
+.app-navigation__link[aria-current="page"]::before {
+    position: absolute;
+    left: -10px;
+    width: 3px;
+    height: 24px;
+    border-radius: 0 3px 3px 0;
+    background: var(--app-nav-accent);
+    content: "";
+}
+
+.app-navigation__link:focus-visible {
+    outline: 2px solid var(--app-nav-accent);
+    outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+    body.has-app-navigation {
+        padding-left: 0;
+        padding-bottom: 58px;
+    }
+
+    .app-navigation {
+        inset: auto 0 0;
+        flex-direction: row;
+        width: auto;
+        height: 58px;
+        padding: 7px 10px;
+        border-top: 1px solid var(--app-nav-line);
+        border-right: 0;
+    }
+
+    .app-navigation__brand {
+        display: none;
+    }
+
+    .app-navigation__list {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 3px;
+    }
+
+    .app-navigation__link {
+        height: 42px;
+    }
+
+    .app-navigation__link[aria-current="page"]::before {
+        inset: auto 50% -7px;
+        width: 24px;
+        height: 3px;
+        transform: translateX(-50%);
+        border-radius: 3px 3px 0 0;
+    }
+}

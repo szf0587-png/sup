@@ -1540,7 +1540,8 @@
             $("decision-agent").classList.add("is-open");
             $("decision-agent").setAttribute("aria-hidden", "false");
         };
-        $("open-decision-agent").addEventListener("click", openDecisionAgent);
+        const sideDecisionAgent = $("open-decision-agent");
+        if (sideDecisionAgent) sideDecisionAgent.addEventListener("click", openDecisionAgent);
         $("open-decision-agent-top").addEventListener("click", openDecisionAgent);
         $("close-decision-agent").addEventListener("click", () => {
             $("decision-agent").classList.remove("is-open");

@@ -22,7 +22,7 @@ button, input, select, textarea { font: inherit; }
 button, a { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(37, 99, 235, .3); outline-offset: 2px; }
 
-.tool-app { display: grid; grid-template-columns: 64px minmax(0, 1fr); min-height: 100dvh; }
+.tool-app { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100dvh; }
 .tool-sidebar { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 10px; background: #17211d; }
 .tool-brand, .tool-nav { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; color: #a8bbb2; text-decoration: none; }
 .tool-brand { margin-bottom: 10px; color: #fff; background: var(--primary); }

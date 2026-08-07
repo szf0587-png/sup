@@ -10,22 +10,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="data-center.css?v=20260803-1">
+    <link rel="stylesheet" href="app-shell.css">
 </head>
 <body>
 <div class="data-app">
-    <aside class="data-sidebar" aria-label="工作台导航">
+    <aside class="data-sidebar" aria-label="项目数据上下文">
         <div class="data-brand">
             <span class="data-brand-mark"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
             <span><strong>天眼寻珍</strong><small>数据资产中心</small></span>
         </div>
-        <nav class="data-nav" aria-label="主导航">
-            <a href="index.html"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>土地资源工作台</span></a>
-            <a href="map3d.html"><i class="fa-solid fa-cube" aria-hidden="true"></i><span>三维场景</span></a>
-            <a href="iserver-tools.html"><i class="fa-solid fa-draw-polygon" aria-hidden="true"></i><span>空间分析</span></a>
-            <a class="is-active" href="data-center.html" aria-current="page"><i class="fa-solid fa-database" aria-hidden="true"></i><span>项目数据</span></a>
-            <a href="golden_standard.html"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>金标准模型</span></a>
-            <a href="ai-chat.html"><i class="fa-solid fa-comments" aria-hidden="true"></i><span>AI 助手</span></a>
-        </nav>
         <div class="data-side-note">
             <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
             <p>资产按当前用户和项目隔离。删除操作会同步请求 iServer，并保留本地审计记录。</p>
@@ -117,6 +110,7 @@
 </dialog>
 
 <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+<script src="shell-navigation.js"></script>
 <script src="auth.js"></script>
 <script src="data-center.js?v=20260803-1"></script>
 </body>

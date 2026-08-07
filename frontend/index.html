@@ -10,20 +10,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
     <link rel="stylesheet" href="land-workbench.css?v=20260731-18">
+    <link rel="stylesheet" href="app-shell.css">
 </head>
 <body>
     <div class="app-shell">
-        <aside class="sidebar" aria-label="主导航">
-            <div class="brand-mark" aria-hidden="true"><i class="fa-solid fa-layer-group"></i></div>
-            <a class="nav-button is-active" href="index.html" aria-label="土地资源工作台" title="土地资源工作台"><i class="fa-solid fa-map-location-dot"></i></a>
-            <a class="nav-button" href="iserver-tools.html" aria-label="iServer 地理处理工具" title="iServer 地理处理工具"><i class="fa-solid fa-draw-polygon"></i></a>
-            <a class="nav-button nav-link" href="data-center.html" aria-label="项目数据中心" title="项目数据中心"><i class="fa-solid fa-database"></i></a>
-            <a class="nav-button nav-link" href="map3d.html" aria-label="三维场景" title="三维场景"><i class="fa-solid fa-cube"></i></a>
-            <button class="nav-button" type="button" aria-label="报告"><i class="fa-solid fa-file-lines"></i></button>
-            <a class="nav-button nav-link" href="golden_standard.html" aria-label="模型库"><i class="fa-solid fa-database"></i></a>
-            <button class="nav-button" id="open-decision-agent" type="button" aria-label="分析决策智能体" title="分析决策智能体"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-        </aside>
-
         <main class="workbench">
             <header class="topbar">
                 <div>
@@ -208,6 +198,7 @@
         <footer><a href="ai-chat.html">配置 AI 供应商与 API Key</a></footer>
     </aside>
 
+    <script src="shell-navigation.js"></script>
     <script src="auth.js"></script>
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="land-workbench.js?v=20260731-19"></script>
