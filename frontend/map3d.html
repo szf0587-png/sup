@@ -390,6 +390,9 @@
         addReferenceImagery(state.viewer, engine);
         const cameraController = state.viewer.scene.screenSpaceCameraController;
         if (cameraController) { cameraController.enableRotate = true; cameraController.enableTilt = true; cameraController.enableZoom = true; cameraController.enableLook = true; }
+        if (state.viewer.scene.globe) state.viewer.scene.globe.depthTestAgainstTerrain = true;
+        state.viewer.scene.terrainExaggeration = state.exaggeration;
+        state.viewer.scene.verticalExaggeration = state.exaggeration;
         state.terrainController = new window.TerrainController({
             engine,
             viewer: state.viewer,
@@ -453,7 +456,7 @@
             return false;
         }
     }
-    function applyCamera() { if (!state.viewer || !state.config?.initial_view) return; const engine = state.engine; const view = state.config.initial_view; const height = Math.max(SAFE_CAMERA_HEIGHT, Number(view.height) * 4); state.viewer.camera.setView({ destination: engine.Cartesian3.fromDegrees(view.longitude, view.latitude, height), orientation: { heading: engine.Math.toRadians(view.heading || 0), pitch: engine.Math.toRadians(-35), roll: 0 } }); }
+    function applyCamera() { if (!state.viewer || !state.config?.initial_view) return; const engine = state.engine; const view = state.config.initial_view; const height = Math.max(1200, Number(view.height) * 1.35); state.viewer.camera.setView({ destination: engine.Cartesian3.fromDegrees(view.longitude, view.latitude, height), orientation: { heading: engine.Math.toRadians(view.heading || 0), pitch: engine.Math.toRadians(-48), roll: 0 } }); }
     async function openRealspace() {
         let engine;
         try { engine = await ensureEngine(); } catch (error) { state.realspaceOpened = false; showEngineFallback(`三维引擎资源不可用：${error.message}`); return; }
@@ -462,27 +465,15 @@
         terrain.setProvider(null);
         terrain.setVisible(false);
 
-        // 尝试加载地形（优先SCT，降级到Cesium World Terrain）
-        try {
-            state.terrainProvider = await createTerrainProvider(engine);
-            if (state.terrainProvider) {
-                terrain.setProvider(state.terrainProvider);
-                terrain.setVisible(true);
-                console.log('[3D] 地形加载成功');
-            } else {
-                console.log('[3D] 无可用地形，使用平面模式');
-            }
-        } catch (error) {
-            console.error('[3D] 地形加载异常:', error);
-            state.terrainProvider = null;
-            // 保持平面地球，不阻塞场景加载
-        }
+        let nativeTerrainOpened = false;
         if (typeof viewer.scene.open === "function" && state.config?.scene_url) {
             try {
                 await viewer.scene.open(state.config.scene_url);
                 state.realspaceOpened = true;
+                nativeTerrainOpened = Boolean(state.terrainDiagnostics?.available);
+                state.terrainEnabled = nativeTerrainOpened;
                 $("engine-status").textContent = "SuperMap Realspace";
-                const sctReady = Boolean(state.terrainDiagnostics?.available && state.terrainProvider);
+                const sctReady = nativeTerrainOpened;
                 $("map-subtitle").textContent = sctReady
                     ? "真实 iServer Realspace + SCT 地形已打开"
                     : "真实 iServer Realspace 已打开，当前无可用 SCT 地形";
@@ -493,12 +484,26 @@
             }
         } else if (await openLegacyRealspace(viewer)) {
             // The npm iClient3D build exposes the legacy layer API instead of scene.open.
+            nativeTerrainOpened = Boolean(state.terrainDiagnostics?.available);
+            state.terrainEnabled = nativeTerrainOpened;
         } else {
             state.realspaceOpened = false;
             $("engine-status").textContent = "Cesium 兼容模式";
             $("map-subtitle").textContent = "已读取 iServer 场景配置，等待 SuperMap3D 运行库";
         }
-        if (state.terrainProvider && viewer.terrainProvider !== state.terrainProvider) terrain.setVisible(true);
+        if (!nativeTerrainOpened) {
+            try {
+                state.terrainProvider = await createTerrainProvider(engine);
+                if (state.terrainProvider) {
+                    terrain.setProvider(state.terrainProvider);
+                    terrain.setVisible(true);
+                    console.log('[3D] 使用 Cesium 地形降级');
+                }
+            } catch (error) {
+                console.error('[3D] Cesium 地形降级失败:', error);
+                state.terrainProvider = null;
+            }
+        }
         applyCamera();
     }
     function homeView() { if (!state.config?.initial_view || !state.viewer) return; applyCamera(); }
@@ -513,8 +518,8 @@
         if (!state.viewer || !state.engine) return;
         const view = terrainFocus();
         state.viewer.camera.flyTo({
-            destination: state.engine.Cartesian3.fromDegrees(view.longitude, view.latitude, Math.max(SAFE_CAMERA_HEIGHT * .72, Number(state.config?.initial_view?.height || 15000) * 2.5)),
-            orientation: { heading: state.engine.Math.toRadians(18), pitch: state.engine.Math.toRadians(-28), roll: 0 },
+            destination: state.engine.Cartesian3.fromDegrees(view.longitude, view.latitude, Math.max(1400, Number(state.config?.initial_view?.height || 1800) * 1.5)),
+            orientation: { heading: state.engine.Math.toRadians(18), pitch: state.engine.Math.toRadians(-48), roll: 0 },
             duration: 1.2,
             complete: () => setStatus("三维地形视角"),
         });
