@@ -44,6 +44,13 @@ test('native Realspace terrain reapplies elevation exaggeration after the scene 
   assert.match(nativeLoad, /setExaggeration\(4\)/);
 });
 
+test('Realspace reports SCT as open only after its TerrainFileLayer exists in the browser scene', () => {
+  assert.match(html, /async function waitForTerrainLayer\(viewer, source\)/);
+  assert.match(html, /state\.terrainLayer = await waitForTerrainLayer\(viewer, terrainSource\)/);
+  assert.match(html, /nativeTerrainOpened = Boolean\(state\.terrainLayer\)/);
+  assert.doesNotMatch(html, /nativeTerrainOpened = Boolean\(state\.terrainDiagnostics\?\.available\)/);
+});
+
 test('map control buttons invoke camera actions and the globe button toggles imagery without leaving 3D', () => {
   assert.match(html, /\$\("home-view"\)\.addEventListener\("click", homeView\)/);
   assert.match(html, /\$\("tilt-view"\)\.addEventListener\("click", setTilt\)/);

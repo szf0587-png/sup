@@ -456,6 +456,20 @@
             return false;
         }
     }
+    async function waitForTerrainLayer(viewer, source) {
+        const name = source?.name || source?.caption || source?.data_name || source?.dataName;
+        const deadline = Date.now() + 10000;
+        while (Date.now() < deadline) {
+            const layer = findSceneLayer(viewer.scene?.layers, name)
+                || (state.terrainLayerIndex >= 0 && viewer.scene?.layers?.get?.(state.terrainLayerIndex));
+            if (layer) {
+                if (layer.readyPromise) await Promise.resolve(layer.readyPromise).catch(() => null);
+                return layer;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, 100));
+        }
+        return null;
+    }
     function applyCamera() { if (!state.viewer || !state.config?.initial_view) return; const engine = state.engine; const view = state.config.initial_view; const height = Math.max(1200, Number(view.height) * 1.35); state.viewer.camera.setView({ destination: engine.Cartesian3.fromDegrees(view.longitude, view.latitude, height), orientation: { heading: engine.Math.toRadians(view.heading || 0), pitch: engine.Math.toRadians(-48), roll: 0 } }); }
     async function openRealspace() {
         let engine;
@@ -470,14 +484,17 @@
             try {
                 await viewer.scene.open(state.config.scene_url);
                 state.realspaceOpened = true;
-                nativeTerrainOpened = Boolean(state.terrainDiagnostics?.available);
+                const terrainSource = state.config.layers?.find(isTerrainLayer);
+                state.terrainLayer = await waitForTerrainLayer(viewer, terrainSource);
+                nativeTerrainOpened = Boolean(state.terrainLayer);
                 state.terrainEnabled = nativeTerrainOpened;
-                setExaggeration(4);
-                $("engine-status").textContent = "SuperMap Realspace";
+                if (nativeTerrainOpened) setExaggeration(4);
+                $("engine-status").textContent = nativeTerrainOpened ? "SuperMap Realspace" : "Realspace 图层未就绪";
                 const sctReady = nativeTerrainOpened;
                 $("map-subtitle").textContent = sctReady
                     ? "真实 iServer Realspace + SCT 地形已打开"
-                    : "真实 iServer Realspace 已打开，当前无可用 SCT 地形";
+                    : "Realspace 已连接，但 SCT 图层未在浏览器中渲染";
+                if (!nativeTerrainOpened) toast("SCT 图层未完成渲染，未启用平面替代模式");
             } catch (error) {
                 state.realspaceOpened = false;
                 showEngineFallback(`Realspace 打开失败：${error.message}`);
@@ -485,7 +502,7 @@
             }
         } else if (await openLegacyRealspace(viewer)) {
             // The npm iClient3D build exposes the legacy layer API instead of scene.open.
-            nativeTerrainOpened = Boolean(state.terrainDiagnostics?.available);
+            nativeTerrainOpened = Boolean(state.terrainLayer);
             state.terrainEnabled = nativeTerrainOpened;
         } else {
             state.realspaceOpened = false;
